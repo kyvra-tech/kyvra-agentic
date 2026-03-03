@@ -1,0 +1,64 @@
+name: Deploy Kyvra Bot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allow manual trigger from GitHub UI
+
+jobs:
+  secret-scan:
+    name: Scan for secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install detect-secrets
+        run: pip install detect-secrets==1.5.0
+
+      - name: Run secret scan
+        run: |
+          detect-secrets scan --baseline .secrets.baseline
+          detect-secrets audit .secrets.baseline --report --fail-on-unaudited
+
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: secret-scan  # only deploy if scan passes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/agentic-kyvra
+
+            # Pull latest code
+            git pull origin main
+
+            # Install/update dependencies
+            pip install -r requirements.txt
+
+            # Write .env from GitHub Secrets
+            cat > .env << 'EOF'
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}
+            PRODUCT_HUNT_API_KEY=${{ secrets.PRODUCT_HUNT_API_KEY }}
+            REPORT_CHAT_IDS=${{ secrets.REPORT_CHAT_IDS }}
+            REPORT_TIME=08:00
+            ACTIVE_MODULE=tech
+            CLAUDE_MODEL=claude-sonnet-4-6
+            EOF
+
+            # Restart bot (assumes systemd service named kyvra-bot)
+            sudo systemctl restart kyvra-bot
+            sudo systemctl status kyvra-bot --no-pager
