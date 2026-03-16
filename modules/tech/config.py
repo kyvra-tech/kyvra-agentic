@@ -17,14 +17,23 @@ SOURCE_AUTHORITY = {
     "Anthropic Blog": 20,
     "OpenAI Blog": 20,
     "Google DeepMind Blog": 18,
-    "HackerNews": 12,
+    "X - AI Leaders": 18,
+    "X - AI Trending": 14,
+    "X - Indie Dev": 12,
     "GitHub Trending": 10,
     "Product Hunt": 8,
     "NewsAPI Tech": 6,
 }
 
-# Spike detection: item is "hot" if HN score > this value
-HN_SPIKE_THRESHOLD = 200
-
 # GitHub: trending repo is notable if stars_today > this
 GITHUB_STARS_SPIKE = 100
+
+# X/Twitter: tweet is viral if likes > this
+X_SPIKE_THRESHOLD = 500
+
+# Key X accounts to monitor (used in AI Leaders query)
+X_AI_LEADER_ACCOUNTS = [
+    "AnthropicAI", "OpenAI", "GoogleDeepMind",
+    "sama", "karpathy", "ylecun", "ilyasut",
+    "levelsio", "marc_louvion",
+]

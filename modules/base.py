@@ -21,6 +21,7 @@ class RawItem:
     score: int = 0      # raw engagement score from source
     comments: int = 0
     authority_score: int = 10
+    cross_source_count: int = 1  # how many sources covered this story (trending signal)
 
 
 class BaseModule(ABC):
