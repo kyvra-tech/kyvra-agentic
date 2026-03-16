@@ -18,21 +18,17 @@ Modular, multi-agent Telegram bot that monitors Tech/AI/Indie Dev news daily and
 ## Architecture
 
 ```
-User / Scheduler (Telegram / Cron)
-          ↓
-    SupervisorAgent (Orchestrator)
-          ↓
-Phase 1:  DataCollectorAgent   → parallel fetch from all sources, keyword filter, cross-source dedup
-          ↓
-Phase 2:  AnalystAgent         ─┐  (run in parallel)
-          NarrativeScoutAgent  ─┘
-          ↓
-Phase 3:  ContentWriterAgent   → calls Grok LLM to write the report
-          ↓
-    Telegram Bot → /report /update /breaking /topic /chat /start /help
+ Telegram  ─┐
+ Discord   ─┤  (interfaces/)       SupervisorAgent
+ Web API   ─┘                            │
+                              Phase 1:   DataCollectorAgent
+                                         (parallel fetch, filter, dedup)
+                              Phase 2:   AnalystAgent ─┐ (parallel)
+                                         NarrativeScout─┘
+                              Phase 3:   ContentWriterAgent (LLM)
 ```
 
-Each agent implements `BaseAgent.run(ctx: PipelineContext) → PipelineContext`. The supervisor passes a typed `PipelineContext` dataclass through the pipeline — no tight coupling between agents.
+Each agent implements `BaseAgent.run(ctx: PipelineContext) → PipelineContext`. The pipeline core is fully decoupled from the delivery layer — adding Discord or a Web API requires zero changes to agents or modules.
 
 `quick_scan()` runs only Phases 1 + 2 (no LLM), used by `/update` and `/breaking` for fast, cheap responses.
 
@@ -119,36 +115,41 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 
 ```
 agentic-kyvra/
-├── main.py                    # Entry point – starts bot + scheduler
+├── main.py                    # Entry point – starts Telegram interface + scheduler
 ├── config.py                  # Env vars and global settings
 ├── requirements.txt
 ├── .env.example
 │
-├── agents/
-│   ├── base.py                # BaseAgent + PipelineContext typed dataclass
-│   ├── supervisor.py          # Pipeline orchestrator (quick_scan / generate_report)
-│   ├── data_collector.py      # Async multi-source fetcher + cross-source dedup
-│   ├── analyst.py             # Confidence Score engine + spike detection
+├── agents/                    # Pipeline core (domain-agnostic)
+│   ├── base.py                # BaseAgent + PipelineContext + ScoredItem
+│   ├── supervisor.py          # Orchestrator: quick_scan / generate_report
+│   ├── data_collector.py      # Async multi-source fetch + cross-source dedup
+│   ├── analyst.py             # Confidence Score + spike detection
 │   ├── narrative_scout.py     # Trend heatmap builder
 │   └── content_writer.py      # Grok report writer + /chat handler
 │
-├── modules/                   # Modular plugins – swap to change niche
-│   ├── base.py                # Abstract BaseModule interface
+├── modules/                   # Niche plugins – swap to change domain
+│   ├── base.py                # BaseModule ABC + RawItem + DataSource
 │   └── tech/
-│       ├── sources.py         # TechModule (implements BaseModule)
+│       ├── sources.py         # TechModule (X, GitHub, RSS sources)
 │       ├── prompts.py         # Grok prompt templates
-│       └── config.py          # Keywords, authority scores, thresholds
+│       └── config.py          # Keywords, authority scores, spike thresholds
 │
-├── bot/
-│   ├── handlers.py            # Command handlers: /start /report /chat /help /update /breaking /topic
-│   ├── scheduler.py           # Daily report cron job
-│   └── formatter.py           # Telegram message chunker + update/breaking formatters
+├── interfaces/                # Delivery channels – one folder per platform
+│   ├── telegram/
+│   │   ├── handlers.py        # /start /report /update /breaking /topic /chat
+│   │   ├── formatter.py       # Message formatting + Telegram chunker
+│   │   └── scheduler.py       # Daily 8AM cron job
+│   ├── discord/
+│   │   └── bot.py             # Placeholder – Phase 2
+│   └── web/
+│       └── app.py             # Placeholder – Phase 2 (FastAPI)
 │
 ├── services/
 │   └── llm.py                 # Centralized LLM client (xAI / OpenAI-compatible)
 │
 └── utils/
-    ├── api_client.py          # Async fetchers: RSS / REST / scrape
+    ├── api_client.py          # Async fetchers: RSS / scrape / X API
     └── cache.py               # TTL in-memory cache
 ```
 

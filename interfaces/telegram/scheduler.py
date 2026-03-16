@@ -3,7 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
 from agents.supervisor import SupervisorAgent, load_module
-from bot.formatter import split_long_message
+from interfaces.telegram.formatter import split_long_message
 from config import ACTIVE_MODULE, REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE
 
 logger = logging.getLogger(__name__)

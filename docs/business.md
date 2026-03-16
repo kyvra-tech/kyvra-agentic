@@ -131,8 +131,10 @@ All sources are free and publicly accessible:
 ### Phase 1 — Signal Quality (Next)
 Make the scoring engine smarter: detect story momentum (velocity), recognize recurring stories as growing trends, and add a `/status` command showing pipeline health.
 
-### Phase 2 — More Sources (Q2)
-Add Reddit (r/MachineLearning, r/LocalLLaMA, r/SideProject), Product Hunt daily launches, and TLDR Tech newsletter aggregation.
+### Phase 2 — More Interfaces + Sources (Q2)
+- **Discord bot** — same commands as Telegram, targeting developer and creator communities
+- **Web API (FastAPI)** — HTTP endpoints enabling frontends, n8n / Make / Zapier integrations
+- **More sources** — Reddit (r/MachineLearning, r/LocalLLaMA, r/SideProject), Product Hunt daily launches, TLDR Tech
 
 ### Phase 3 — New Modules (Q2–Q3)
 Plug-and-play modules for new niches:

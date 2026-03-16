@@ -2,11 +2,11 @@ import logging
 import asyncio
 from telegram.ext import Application, CommandHandler
 from config import TELEGRAM_BOT_TOKEN, XAI_API_KEY
-from bot.handlers import (
+from interfaces.telegram.handlers import (
     cmd_start, cmd_help, cmd_report, cmd_chat, error_handler,
     cmd_update, cmd_breaking, cmd_topic,
 )
-from bot.scheduler import setup_scheduler
+from interfaces.telegram.scheduler import setup_scheduler
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",

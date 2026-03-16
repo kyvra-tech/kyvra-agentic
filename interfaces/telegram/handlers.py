@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
-from bot.formatter import split_long_message, format_update, format_breaking
+from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
 from config import ACTIVE_MODULE
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         "*Kyvra – AI Tech Content Agent*\n\n"
         "⚡ */update* – Fast scan, top scored items, no AI writing (~10 sec)\n"
-        "🚨 */breaking* – Spike items only (viral X tweets, HN front page)\n"
+        "🚨 */breaking* – Spike items only (viral X tweets, GitHub trending)\n"
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
         "   e.g. `/topic openai` `/topic agent` `/topic indie`\n"
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"

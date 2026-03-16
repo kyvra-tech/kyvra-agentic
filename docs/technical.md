@@ -8,6 +8,22 @@ Kyvra is a multi-agent Python pipeline that monitors Tech/AI news sources, score
 
 ## Architecture
 
+### Delivery layer model
+
+The pipeline core (`agents/`, `modules/`, `services/`) is fully decoupled from delivery. Each interface in `interfaces/` calls `SupervisorAgent` independently:
+
+```
+interfaces/telegram/   → python-telegram-bot
+interfaces/discord/    → discord.py          (Phase 2)
+interfaces/web/        → FastAPI             (Phase 2)
+        │
+        └──► SupervisorAgent → Pipeline (agents + modules + services)
+```
+
+Adding a new interface requires zero changes to agents or modules.
+
+---
+
 ### Pipeline execution model
 
 ```
@@ -172,7 +188,7 @@ The `/chat` command also calls the LLM directly via `chat_with_llm()` in [agents
 
 ## Bot commands → pipeline mapping
 
-Defined in [bot/handlers.py](../bot/handlers.py):
+Defined in [interfaces/telegram/handlers.py](../interfaces/telegram/handlers.py):
 
 | Command | Supervisor method | Phase 3 |
 |---|---|---|
@@ -197,6 +213,48 @@ All env vars loaded via `python-dotenv` in [config.py](../config.py):
 | `ACTIVE_MODULE` | `tech` | Module name |
 | `MAX_REPORT_ITEMS` | `7` | Top N items passed to ContentWriter |
 | `X_BEARER_TOKEN` | optional | Required only if X sources are enabled |
+
+---
+
+## Project structure
+
+```
+agentic-kyvra/
+├── main.py                          # Entry point – starts Telegram interface + scheduler
+├── config.py                        # Env vars and global settings
+│
+├── agents/                          # Pipeline agents (domain-agnostic)
+│   ├── base.py                      # BaseAgent + PipelineContext + ScoredItem
+│   ├── supervisor.py                # Orchestrator: quick_scan / generate_report
+│   ├── data_collector.py            # Async multi-source fetch + dedup
+│   ├── analyst.py                   # Confidence Score + spike detection
+│   ├── narrative_scout.py           # Trend heatmap
+│   └── content_writer.py            # LLM report writer + /chat
+│
+├── modules/                         # Niche plugins (swap to change domain)
+│   ├── base.py                      # BaseModule ABC + RawItem + DataSource
+│   └── tech/
+│       ├── sources.py               # TechModule (X, GitHub, RSS sources)
+│       ├── prompts.py               # Grok prompt templates
+│       └── config.py                # Keywords, authority scores, spike thresholds
+│
+├── interfaces/                      # Delivery channels (one folder per platform)
+│   ├── telegram/
+│   │   ├── handlers.py              # /start /report /update /breaking /topic /chat
+│   │   ├── formatter.py             # Telegram message formatting + chunker
+│   │   └── scheduler.py             # Daily 8AM cron job
+│   ├── discord/
+│   │   └── bot.py                   # Placeholder — Phase 2
+│   └── web/
+│       └── app.py                   # Placeholder — Phase 2 (FastAPI)
+│
+├── services/
+│   └── llm.py                       # Centralized LLM client (xAI / OpenAI-compatible)
+│
+└── utils/
+    ├── api_client.py                # Async fetchers: RSS / scrape / X API
+    └── cache.py                     # TTL in-memory cache
+```
 
 ---
 
