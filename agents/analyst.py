@@ -4,7 +4,7 @@ from datetime import datetime
 
 from agents.base import BaseAgent, PipelineContext, ScoredItem
 from modules.base import RawItem
-from modules.tech.config import HN_SPIKE_THRESHOLD, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD
+from modules.tech.config import GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD
 from config import MAX_REPORT_ITEMS
 
 # X authority accounts get a minimum engagement floor.
@@ -47,11 +47,7 @@ def _recency_score(published_at: str) -> int:
 
 def _engagement_score(item: RawItem) -> int:
     """0–40 pts from source-specific engagement signals."""
-    if item.source == "HackerNews":
-        # points 0–30, comments 0–10
-        return min(30, int(item.score / 10)) + min(10, int(item.comments / 20))
-
-    elif item.source == "GitHub Trending":
+    if item.source == "GitHub Trending":
         # stars_today 0–40
         return min(40, int(item.score / 3))
 
@@ -87,8 +83,7 @@ def _cross_source_boost(item: RawItem) -> int:
 
 def _is_spike(item: RawItem) -> bool:
     return (
-        (item.source == "HackerNews" and item.score >= HN_SPIKE_THRESHOLD)
-        or (item.source == "GitHub Trending" and item.score >= GITHUB_STARS_SPIKE)
+        (item.source == "GitHub Trending" and item.score >= GITHUB_STARS_SPIKE)
         or (item.source.startswith("X -") and item.score >= X_SPIKE_THRESHOLD)
     )
 

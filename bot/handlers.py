@@ -16,7 +16,7 @@ MAX_HISTORY = 10  # keep last N turns
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         "👋 Hey! I'm *Kyvra* – your AI content agent for Tech, AI & Indie Dev.\n\n"
-        "I monitor X/Twitter, HackerNews, GitHub Trending, Anthropic, OpenAI and DeepMind "
+        "I monitor X/Twitter, GitHub Trending, Anthropic, OpenAI and DeepMind "
         "then distill it into a daily briefing with content angles every morning at 8 AM.\n\n"
         "*Commands:*\n"
         "/update – Fast news scan right now (no AI, ~10 sec)\n"

@@ -119,7 +119,6 @@ All sources are free and publicly accessible:
 | **X/Twitter — AI Leaders** | Announcements and commentary from top AI accounts |
 | **X/Twitter — AI Trending** | Viral AI/tech tweets across the platform |
 | **X/Twitter — Indie Dev** | Indie maker launches and discussions |
-| **Hacker News** | Developer community's most upvoted tech stories |
 | **GitHub Trending** | Open source projects gaining the most stars today |
 | **Anthropic Blog** | Claude model releases and research |
 | **OpenAI Blog** | GPT/API product launches |

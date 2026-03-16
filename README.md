@@ -63,7 +63,7 @@ Top 7 Tech Insights today:
 
 | Signal | Points |
 |---|---|
-| Engagement (HN score, GitHub stars/day, X likes) | 0 – 40 |
+| Engagement (GitHub stars/day, X likes) | 0 – 40 |
 | Source authority (Anthropic/OpenAI blog = 20) | 0 – 20 |
 | Recency (< 6h = 20, < 24h = 13, < 48h = 6) | 0 – 20 |
 | Relevance base (passed keyword filter) | 10 |
@@ -80,7 +80,6 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 | X – AI Leaders | Tweets from top AI accounts (pre-curated list) |
 | X – AI Trending | AI/LLM keyword search, min engagement filter |
 | X – Indie Dev | Indie maker keyword search |
-| HackerNews API | Top stories, Show HN, scores + comments |
 | GitHub Trending | Trending repos, stars/day |
 | Anthropic Blog RSS | New models, research, announcements |
 | OpenAI Blog RSS | Product launches, API updates |

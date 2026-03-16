@@ -46,7 +46,7 @@ Produced by `DataCollectorAgent`. Defined in [modules/base.py](../modules/base.p
 |---|---|---|
 | `title` | `str` | Item headline |
 | `url` | `str` | Canonical URL |
-| `source` | `str` | Source name (e.g. `"HackerNews"`, `"X - AI Leaders"`) |
+| `source` | `str` | Source name (e.g. `"GitHub Trending"`, `"X - AI Leaders"`) |
 | `published_at` | `str` | ISO 8601 or Unix timestamp string |
 | `summary` | `str` | Short description or tweet text |
 | `score` | `int` | Raw engagement signal (HN points, stars/day, X likes) |
@@ -97,7 +97,6 @@ confidence = engagement + authority + recency + relevance + cross_boost
 | **Cross-source boost** | 0 or 10 | +10 if same story appeared in 2+ sources |
 
 **Spike detection** — `is_spike=True` when raw engagement exceeds thresholds defined in `modules/tech/config.py`:
-- HackerNews: `score >= HN_SPIKE_THRESHOLD`
 - GitHub: `score >= GITHUB_STARS_SPIKE`
 - X: `score >= X_SPIKE_THRESHOLD`
 
@@ -155,7 +154,6 @@ All fetching logic lives in [utils/api_client.py](../utils/api_client.py). The `
 
 | Type | Fetcher | Data returned |
 |---|---|---|
-| `"hn"` | HackerNews Algolia API | Top/Show HN stories with score + comments |
 | `"github"` | GitHub Trending scrape (BeautifulSoup4) | Repo name, description, stars today |
 | `"rss"` | feedparser | Feed entries with title, link, summary, published |
 | `"x"` | X API v2 (Bearer token) | Tweets with like/reply counts, author info |

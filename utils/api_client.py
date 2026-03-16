@@ -40,44 +40,6 @@ async def fetch_rss(source: DataSource) -> list[RawItem]:
         return []
 
 
-async def fetch_hackernews(source: DataSource) -> list[RawItem]:
-    cached = cache.get("hn:top")
-    if cached:
-        return cached
-
-    try:
-        async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
-            resp = await client.get(source.url)
-            story_ids = resp.json()[:source.params.get("limit", 30)]
-
-            items = []
-            for story_id in story_ids:
-                try:
-                    story_resp = await client.get(
-                        f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
-                    )
-                    story = story_resp.json()
-                    if not story or story.get("type") != "story":
-                        continue
-                    items.append(RawItem(
-                        title=story.get("title", ""),
-                        url=story.get("url", f"https://news.ycombinator.com/item?id={story_id}"),
-                        source=source.name,
-                        published_at=str(story.get("time", "")),
-                        summary="",
-                        score=story.get("score", 0),
-                        comments=story.get("descendants", 0),
-                        authority_score=source.authority_score,
-                    ))
-                except Exception:
-                    continue
-
-        cache.set("hn:top", items)
-        return items
-    except Exception as e:
-        logger.warning(f"HackerNews fetch failed: {e}")
-        return []
-
 
 async def fetch_github_trending(source: DataSource) -> list[RawItem]:
     cached = cache.get("github:trending")
@@ -186,8 +148,6 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
 async def fetch_source(source: DataSource) -> list[RawItem]:
     if source.source_type == "rss":
         return await fetch_rss(source)
-    elif source.source_type == "rest" and source.name == "HackerNews":
-        return await fetch_hackernews(source)
     elif source.source_type == "scrape" and source.name == "GitHub Trending":
         return await fetch_github_trending(source)
     elif source.source_type == "x":

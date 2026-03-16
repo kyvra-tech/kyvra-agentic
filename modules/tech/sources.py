@@ -40,13 +40,6 @@ class TechModule(BaseModule):
             ),
             # --- Supplementary sources ---
             DataSource(
-                name="HackerNews",
-                url="https://hacker-news.firebaseio.com/v0/topstories.json",
-                source_type="rest",
-                params={"limit": 30},
-                authority_score=SOURCE_AUTHORITY["HackerNews"],
-            ),
-            DataSource(
                 name="GitHub Trending",
                 url="https://github.com/trending",
                 source_type="scrape",
