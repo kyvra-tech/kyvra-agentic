@@ -1,26 +1,28 @@
-import logging
 import time
-from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from modules.base import RawItem
-from modules.tech.config import HN_SPIKE_THRESHOLD, GITHUB_STARS_SPIKE
+from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from agents.base import BaseAgent, PipelineContext, ScoredItem
+from modules.base import RawItem
+from modules.tech.config import HN_SPIKE_THRESHOLD, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD
+from config import MAX_REPORT_ITEMS
+
+# X authority accounts get a minimum engagement floor.
+# A @AnthropicAI tweet with 20 likes announcing a new model is more valuable
+# than its raw like count suggests — same floor as RSS sources.
+_AUTHORITY_SOURCES = {"X - AI Leaders"}
+_AUTHORITY_ENGAGEMENT_FLOOR = 15
 
 
 def _parse_timestamp(published_at: str) -> float | None:
-    """Try to parse various timestamp formats → unix timestamp."""
     if not published_at:
         return None
-    # Unix timestamp (HackerNews)
     if published_at.isdigit():
         return float(published_at)
-    # RFC 2822 (RSS)
     try:
         return parsedate_to_datetime(published_at).timestamp()
     except Exception:
         pass
-    # ISO 8601
     try:
         return datetime.fromisoformat(published_at.replace("Z", "+00:00")).timestamp()
     except Exception:
@@ -29,10 +31,10 @@ def _parse_timestamp(published_at: str) -> float | None:
 
 
 def _recency_score(published_at: str) -> int:
-    """0-20 points based on how recent the item is."""
+    """0–20 pts. Fresher = higher."""
     ts = _parse_timestamp(published_at)
     if ts is None:
-        return 5  # unknown age → small score
+        return 5
     age_hours = (time.time() - ts) / 3600
     if age_hours < 6:
         return 20
@@ -44,61 +46,97 @@ def _recency_score(published_at: str) -> int:
 
 
 def _engagement_score(item: RawItem) -> int:
-    """0-40 points from engagement signals."""
+    """0–40 pts from source-specific engagement signals."""
     if item.source == "HackerNews":
-        # HN points 0-30, comments 0-10
-        pts = min(30, int(item.score / 10))
-        cmts = min(10, int(item.comments / 20))
-        return pts + cmts
+        # points 0–30, comments 0–10
+        return min(30, int(item.score / 10)) + min(10, int(item.comments / 20))
+
     elif item.source == "GitHub Trending":
-        # stars today 0-40
+        # stars_today 0–40
         return min(40, int(item.score / 3))
+
+    elif item.source.startswith("X -"):
+        # likes 0–35, replies 0–5
+        raw = min(35, int(item.score / 15)) + min(5, int(item.comments / 5))
+        # Authority account floor: a low-likes announcement from a trusted account
+        # should not be penalised below the RSS baseline
+        if item.source in _AUTHORITY_SOURCES:
+            return max(_AUTHORITY_ENGAGEMENT_FLOOR, raw)
+        return raw
+
     else:
-        # RSS sources: no engagement data → fixed mid value
+        # RSS: no engagement data → baseline
         return 15
 
 
-def calculate_confidence(item: RawItem) -> tuple[int, bool]:
-    """Return (confidence_score 0-100, is_spike bool)."""
-    engagement = _engagement_score(item)        # 0-40
-    authority = item.authority_score             # 0-20
-    recency = _recency_score(item.published_at)  # 0-20
-    relevance = 10                               # base: passed keyword filter
-    total = min(100, engagement + authority + recency + relevance)
+def _relevance_score(item: RawItem, keywords: list[str]) -> int:
+    """10 base + 2 per additional keyword match, capped at 20.
 
-    is_spike = (
+    Rationale: an item matching 'openai', 'gpt', AND 'agent' is more on-topic
+    than one that just scraped past a single keyword.
+    """
+    text = (item.title + " " + item.summary).lower()
+    hits = sum(1 for kw in keywords if kw in text)
+    return min(20, 10 + max(0, hits - 1) * 2)
+
+
+def _cross_source_boost(item: RawItem) -> int:
+    """0 or 10 pts. A story covered by 2+ sources is independently validated as trending."""
+    return 10 if item.cross_source_count >= 2 else 0
+
+
+def _is_spike(item: RawItem) -> bool:
+    return (
         (item.source == "HackerNews" and item.score >= HN_SPIKE_THRESHOLD)
         or (item.source == "GitHub Trending" and item.score >= GITHUB_STARS_SPIKE)
+        or (item.source.startswith("X -") and item.score >= X_SPIKE_THRESHOLD)
     )
-    return total, is_spike
 
 
-class AnalystAgent:
-    """Scores each item with a Confidence Score (0-100) and flags spikes."""
+def score_item(item: RawItem, keywords: list[str]) -> ScoredItem:
+    engagement   = _engagement_score(item)          # 0–40
+    authority    = item.authority_score              # 0–20
+    recency      = _recency_score(item.published_at) # 0–20
+    relevance    = _relevance_score(item, keywords)  # 10–20  (was fixed at 10)
+    cross_boost  = _cross_source_boost(item)         # 0 or 10
 
-    async def run(self, context: dict) -> dict:
-        raw_items: list[RawItem] = context.get("raw_items", [])
-        logger.info(f"[Analyst] Scoring {len(raw_items)} items...")
+    confidence = min(100, engagement + authority + recency + relevance + cross_boost)
 
-        scored = []
-        for item in raw_items:
-            score, is_spike = calculate_confidence(item)
-            scored.append({
-                "title": item.title,
-                "url": item.url,
-                "source": item.source,
-                "published_at": item.published_at,
-                "summary": item.summary,
-                "confidence_score": score,
-                "is_spike": is_spike,
-                "raw_score": item.score,
-            })
+    return ScoredItem(
+        title=item.title,
+        url=item.url,
+        source=item.source,
+        published_at=item.published_at,
+        summary=item.summary,
+        confidence_score=confidence,
+        is_spike=_is_spike(item),
+        raw_score=item.score,
+        cross_source_count=item.cross_source_count,
+    )
 
-        # Sort by confidence score descending
-        scored.sort(key=lambda x: (x["is_spike"], x["confidence_score"]), reverse=True)
 
-        from config import MAX_REPORT_ITEMS
-        context["scored_items"] = scored[:MAX_REPORT_ITEMS * 2]  # keep buffer for narrative
-        context["top_items"] = scored[:MAX_REPORT_ITEMS]
-        logger.info(f"[Analyst] Top item: {scored[0]['title'][:60] if scored else 'none'} | Score: {scored[0]['confidence_score'] if scored else 0}")
-        return context
+class AnalystAgent(BaseAgent):
+    """Scores each item 0–100 and flags spikes. Higher score = more trending/hot."""
+
+    async def run(self, ctx: PipelineContext) -> PipelineContext:
+        self._log(f"Scoring {len(ctx.raw_items)} items...")
+        keywords = [kw.lower() for kw in ctx.module.get_keywords()]
+
+        scored = sorted(
+            [score_item(item, keywords) for item in ctx.raw_items],
+            key=lambda x: (x.is_spike, x.confidence_score),
+            reverse=True,
+        )
+
+        ctx.scored_items = scored[: MAX_REPORT_ITEMS * 2]
+        ctx.top_items = scored[:MAX_REPORT_ITEMS]
+
+        if scored:
+            top = scored[0]
+            spikes = sum(1 for s in scored if s.is_spike)
+            cross = sum(1 for s in scored if s.cross_source_count >= 2)
+            self._log(
+                f"Top: '{top.title[:55]}' score={top.confidence_score} spike={top.is_spike} | "
+                f"total={len(scored)} spikes={spikes} cross-source={cross}"
+            )
+        return ctx

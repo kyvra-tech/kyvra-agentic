@@ -123,6 +123,66 @@ async def fetch_github_trending(source: DataSource) -> list[RawItem]:
         return []
 
 
+async def fetch_x_search(source: DataSource) -> list[RawItem]:
+    from config import X_BEARER_TOKEN
+    if not X_BEARER_TOKEN:
+        logger.warning(f"X_BEARER_TOKEN not set, skipping {source.name}")
+        return []
+
+    query = source.params.get("query", "")
+    max_results = source.params.get("max_results", 10)
+    cache_key = f"x:{source.name}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        headers = {**HEADERS, "Authorization": f"Bearer {X_BEARER_TOKEN}"}
+        params = {
+            "query": query,
+            "max_results": max_results,
+            "tweet.fields": "created_at,public_metrics,author_id,text",
+            "expansions": "author_id",
+            "user.fields": "username,name",
+        }
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.twitter.com/2/tweets/search/recent",
+                headers=headers,
+                params=params,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        tweets = data.get("data", [])
+        users = {u["id"]: u for u in data.get("includes", {}).get("users", [])}
+
+        items = []
+        for tweet in tweets:
+            author = users.get(tweet.get("author_id", ""), {})
+            username = author.get("username", "unknown")
+            metrics = tweet.get("public_metrics", {})
+            text = tweet.get("text", "")
+            tweet_id = tweet.get("id", "")
+            items.append(RawItem(
+                title=text[:280],
+                url=f"https://x.com/{username}/status/{tweet_id}",
+                source=source.name,
+                published_at=tweet.get("created_at", ""),
+                summary=text,
+                score=metrics.get("like_count", 0),
+                comments=metrics.get("reply_count", 0),
+                authority_score=source.authority_score,
+            ))
+
+        cache.set(cache_key, items)
+        logger.info(f"[X] {source.name}: fetched {len(items)} tweets")
+        return items
+    except Exception as e:
+        logger.warning(f"X search failed for {source.name}: {e}")
+        return []
+
+
 async def fetch_source(source: DataSource) -> list[RawItem]:
     if source.source_type == "rss":
         return await fetch_rss(source)
@@ -130,6 +190,8 @@ async def fetch_source(source: DataSource) -> list[RawItem]:
         return await fetch_hackernews(source)
     elif source.source_type == "scrape" and source.name == "GitHub Trending":
         return await fetch_github_trending(source)
+    elif source.source_type == "x":
+        return await fetch_x_search(source)
     else:
         logger.warning(f"No fetcher for source: {source.name} ({source.source_type})")
         return []

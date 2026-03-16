@@ -7,8 +7,10 @@ Modular, multi-agent Telegram bot that monitors Tech/AI/Indie Dev news daily and
 ## What it does
 
 - **Daily Morning Report** – auto-sent at 8:00 AM (GMT+7) every day
-- **On-demand Report** – trigger anytime via `/report`
-- **AI Chat** – ask anything about tech/AI news via `/chat`
+- **Fast Scan** – `/update` returns top scored items in ~10 sec, no LLM cost
+- **Breaking Alerts** – `/breaking` shows only spike items (viral X tweets, HN front page)
+- **Topic Report** – `/topic [keyword]` scopes the full AI report to one topic
+- **AI Chat** – `/chat` lets you ask anything about tech/AI news with conversation history
 - **Content Angles** – every insight comes with a suggested Twitter thread, TikTok, or newsletter angle
 
 ---
@@ -20,22 +22,26 @@ User / Scheduler (Telegram / Cron)
           ↓
     SupervisorAgent (Orchestrator)
           ↓
-├── DataCollectorAgent   → fetches from HN, GitHub, Anthropic/OpenAI/DeepMind RSS
-├── AnalystAgent         → calculates Confidence Score 0-100, flags spikes
-├── NarrativeScoutAgent  → builds trend heatmap from scored items
-└── ContentWriterAgent   → calls Claude to write the report
+Phase 1:  DataCollectorAgent   → parallel fetch from all sources, keyword filter, cross-source dedup
           ↓
-    Telegram Bot → /report, /chat, /start, /help
+Phase 2:  AnalystAgent         ─┐  (run in parallel)
+          NarrativeScoutAgent  ─┘
+          ↓
+Phase 3:  ContentWriterAgent   → calls Grok LLM to write the report
+          ↓
+    Telegram Bot → /report /update /breaking /topic /chat /start /help
 ```
 
-Each agent is a plain Python class with `async def run(context) → context`. The supervisor passes a shared `context` dict through the pipeline — no tight coupling between agents.
+Each agent implements `BaseAgent.run(ctx: PipelineContext) → PipelineContext`. The supervisor passes a typed `PipelineContext` dataclass through the pipeline — no tight coupling between agents.
+
+`quick_scan()` runs only Phases 1 + 2 (no LLM), used by `/update` and `/breaking` for fast, cheap responses.
 
 ---
 
 ## Report Format
 
 ```
-🤖 KYVRA TECH REPORT – 03/03/2026
+🤖 KYVRA TECH REPORT – 16/03/2026
 
 Top 7 Tech Insights today:
 
@@ -57,10 +63,13 @@ Top 7 Tech Insights today:
 
 | Signal | Points |
 |---|---|
-| Engagement (HN score, GitHub stars/day) | 0 – 40 |
+| Engagement (HN score, GitHub stars/day, X likes) | 0 – 40 |
 | Source authority (Anthropic/OpenAI blog = 20) | 0 – 20 |
 | Recency (< 6h = 20, < 24h = 13, < 48h = 6) | 0 – 20 |
 | Relevance base (passed keyword filter) | 10 |
+| Cross-source boost (+5 per extra source, max 15) | 0 – 15 |
+
+Items with engagement far above average are flagged as **spikes** (`is_spike=True`) and surfaced by `/breaking`.
 
 ---
 
@@ -68,6 +77,9 @@ Top 7 Tech Insights today:
 
 | Source | Data |
 |---|---|
+| X – AI Leaders | Tweets from top AI accounts (pre-curated list) |
+| X – AI Trending | AI/LLM keyword search, min engagement filter |
+| X – Indie Dev | Indie maker keyword search |
 | HackerNews API | Top stories, Show HN, scores + comments |
 | GitHub Trending | Trending repos, stars/day |
 | Anthropic Blog RSS | New models, research, announcements |
@@ -76,12 +88,26 @@ Top 7 Tech Insights today:
 
 ---
 
+## Telegram Commands
+
+| Command | Description |
+|---|---|
+| `/start` | Welcome message + command list |
+| `/help` | Full command reference |
+| `/update` | Fast scan – top scored items, no AI (~10 sec) |
+| `/breaking` | Spike alerts only (viral/trending items) |
+| `/topic [keyword]` | AI report scoped to one topic, e.g. `/topic openai` |
+| `/report` | Full AI-written daily report (30–60 sec) |
+| `/chat [question]` | Chat about tech news with conversation memory |
+
+---
+
 ## Stack
 
 | Layer | Tech |
 |---|---|
 | Bot | python-telegram-bot v21 (async) |
-| AI | Anthropic SDK – `claude-sonnet-4-6` |
+| AI | xAI SDK (OpenAI-compatible) – `grok-3-latest` |
 | Scheduler | APScheduler 3.x (AsyncIOScheduler) |
 | HTTP client | httpx (async) |
 | RSS parsing | feedparser |
@@ -100,23 +126,27 @@ agentic-kyvra/
 ├── .env.example
 │
 ├── agents/
-│   ├── supervisor.py          # Pipeline orchestrator
-│   ├── data_collector.py      # Async multi-source fetcher
-│   ├── analyst.py             # Confidence Score engine
+│   ├── base.py                # BaseAgent + PipelineContext typed dataclass
+│   ├── supervisor.py          # Pipeline orchestrator (quick_scan / generate_report)
+│   ├── data_collector.py      # Async multi-source fetcher + cross-source dedup
+│   ├── analyst.py             # Confidence Score engine + spike detection
 │   ├── narrative_scout.py     # Trend heatmap builder
-│   └── content_writer.py      # Claude report writer + chat
+│   └── content_writer.py      # Grok report writer + /chat handler
 │
 ├── modules/                   # Modular plugins – swap to change niche
 │   ├── base.py                # Abstract BaseModule interface
 │   └── tech/
 │       ├── sources.py         # TechModule (implements BaseModule)
-│       ├── prompts.py         # Claude prompt templates
+│       ├── prompts.py         # Grok prompt templates
 │       └── config.py          # Keywords, authority scores, thresholds
 │
 ├── bot/
-│   ├── handlers.py            # Command handlers: /start /report /chat /help
+│   ├── handlers.py            # Command handlers: /start /report /chat /help /update /breaking /topic
 │   ├── scheduler.py           # Daily report cron job
-│   └── formatter.py           # Telegram message chunker (4096 char limit)
+│   └── formatter.py           # Telegram message chunker + update/breaking formatters
+│
+├── services/
+│   └── llm.py                 # Centralized LLM client (xAI / OpenAI-compatible)
 │
 └── utils/
     ├── api_client.py          # Async fetchers: RSS / REST / scrape
@@ -133,20 +163,27 @@ agentic-kyvra/
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Install pre-commit hooks (blocks commits that contain secrets)
-pip install pre-commit
+# 2. Install pre-commit hooks (blocks commits containing secrets)
+pip install pre-commit detect-secrets
 pre-commit install
 
-# 3. Generate the secrets baseline (first time only)
-detect-secrets scan > .secrets.baseline
-
-# 4. Configure environment
+# 3. Configure environment
 cp .env.example .env
-# Edit .env: add TELEGRAM_BOT_TOKEN and ANTHROPIC_API_KEY
+# Edit .env: add TELEGRAM_BOT_TOKEN and XAI_API_KEY
 
-# 5. Run
+# 4. Run
 python main.py
 ```
+
+### Required env vars
+
+| Variable | Description |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token (from [@BotFather](https://t.me/BotFather)) |
+| `XAI_API_KEY` | xAI API key (from [console.x.ai](https://console.x.ai)) |
+| `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs for auto-report |
+| `REPORT_TIME` | Daily report time, HH:MM format (default: `08:00`) |
+| `ACTIVE_MODULE` | Module to use (default: `tech`) |
 
 ### Production deployment (GitHub Actions → server)
 
@@ -155,9 +192,7 @@ Secrets are stored in **GitHub → Settings → Secrets and variables → Action
 | GitHub Secret | Description |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
-| `ANTHROPIC_API_KEY` | From [console.anthropic.com](https://console.anthropic.com) |
-| `NEWS_API_KEY` | From [newsapi.org](https://newsapi.org) |
-| `PRODUCT_HUNT_API_KEY` | From [api.producthunt.com](https://api.producthunt.com) |
+| `XAI_API_KEY` | From [console.x.ai](https://console.x.ai) |
 | `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs |
 | `SERVER_HOST` | SSH host of your server |
 | `SERVER_USER` | SSH username |
@@ -175,30 +210,9 @@ sudo systemctl enable kyvra-bot
 sudo systemctl start kyvra-bot
 ```
 
-### Required env vars
-
-| Variable | Description |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs for auto-report |
-| `REPORT_TIME` | Daily report time, HH:MM format (default: `08:00`) |
-| `ACTIVE_MODULE` | Module to use (default: `tech`) |
-
 ---
 
-## Telegram Commands
-
-| Command | Description |
-|---|---|
-| `/start` | Welcome message + onboarding |
-| `/report` | Trigger full report immediately |
-| `/chat [message]` | Chat with AI about tech/AI news |
-| `/help` | Show command list |
-
----
-
-## Adding a New Module (Crypto, Finance, News…)
+## Adding a New Module (Crypto, Finance, Vietnam…)
 
 1. Create `modules/<niche>/` with `sources.py`, `prompts.py`, `config.py`
 2. Implement `BaseModule` in `sources.py`
@@ -211,8 +225,14 @@ Zero changes to agents, bot, or scheduler.
 
 ## Roadmap
 
-- **Phase 2** – Crypto module (whale moves, OI/Funding spikes, DeFiLlama)
-- **Phase 2** – User preferences per chat (focus topics, content style)
-- **Phase 3** – Auto-generate full Twitter thread / newsletter draft
-- **Phase 3** – Multi-module support (user picks niche in bot)
-- **Phase 4** – Pro tier, white-label API for agencies
+See [ROADMAP.md](ROADMAP.md) for the full plan. High-level phases:
+
+| Phase | Goal | Status |
+|---|---|---|
+| 0 – Foundation | Multi-agent pipeline, Telegram bot, daily report | ✅ Done |
+| 1 – Signal Quality | Velocity signal, story continuity, `/status` command | 🔜 Next |
+| 2 – More Sources | Reddit, Product Hunt, YouTube, TLDR Tech | Q2 |
+| 3 – New Modules | Crypto, Vietnam, Indie niches | Q2–Q3 |
+| 4 – Creator Outputs | `/thread` `/newsletter` `/script` `/brief` | Q3 |
+| 5 – Memory | Seen-item suppression, user feedback, topic subscriptions | Q4 |
+| 6 – Autonomous Mode | Breaking news push alerts, headless `--once` mode | Q4+ |

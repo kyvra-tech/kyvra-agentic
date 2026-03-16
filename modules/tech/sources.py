@@ -1,6 +1,8 @@
 from modules.base import BaseModule, DataSource
-from modules.tech.config import KEYWORDS, SOURCE_AUTHORITY
+from modules.tech.config import KEYWORDS, SOURCE_AUTHORITY, X_AI_LEADER_ACCOUNTS
 from modules.tech import prompts
+
+_X_LEADER_QUERY = " OR ".join(f"from:{a}" for a in X_AI_LEADER_ACCOUNTS) + " -is:retweet lang:en"
 
 
 class TechModule(BaseModule):
@@ -8,6 +10,35 @@ class TechModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
+            # --- X (primary real-time sources) ---
+            DataSource(
+                name="X - AI Leaders",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_LEADER_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - AI Leaders"],
+            ),
+            DataSource(
+                name="X - AI Trending",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={
+                    "query": "(AI agent OR LLM OR Claude OR Gemini OR GPT) -is:retweet lang:en min_faves:100",
+                    "max_results": 10,
+                },
+                authority_score=SOURCE_AUTHORITY["X - AI Trending"],
+            ),
+            DataSource(
+                name="X - Indie Dev",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={
+                    "query": "(\"just launched\" OR \"just shipped\" OR \"I built\" OR \"indie hacker\") -is:retweet lang:en min_faves:50",
+                    "max_results": 10,
+                },
+                authority_score=SOURCE_AUTHORITY["X - Indie Dev"],
+            ),
+            # --- Supplementary sources ---
             DataSource(
                 name="HackerNews",
                 url="https://hacker-news.firebaseio.com/v0/topstories.json",
