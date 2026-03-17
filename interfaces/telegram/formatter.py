@@ -1,9 +1,15 @@
 from datetime import datetime, timezone, timedelta
+import re
 from agents.base import ScoredItem
 
 _VN_TZ = timezone(timedelta(hours=7))
 _SPIKE_LABEL = "🔴 SPIKE"
 _SCORE_EMOJI = {80: "📈", 60: "🟡", 0: "⬜"}
+
+
+def _escape_md(text: str) -> str:
+    """Escape Markdown special characters in plain text."""
+    return re.sub(r"([*_`\[\]])", r"\\\1", text)
 
 
 def _score_emoji(score: int) -> str:
@@ -20,7 +26,7 @@ def format_update(items: list[ScoredItem], total_fetched: int) -> str:
         spike = f" {_SPIKE_LABEL}" if item.is_spike else ""
         emoji = _score_emoji(item.confidence_score)
         source_tag = f"[{item.source}]"
-        title = item.title[:80] + ("…" if len(item.title) > 80 else "")
+        title = _escape_md(item.title[:80] + ("…" if len(item.title) > 80 else ""))
         lines.append(f"{emoji}{spike} *{source_tag}* {title}")
         lines.append(f"└ Score: {item.confidence_score}/100 | {item.url}\n")
     lines.append("_Use /report for full AI\\-written analysis_")
@@ -33,7 +39,7 @@ def format_breaking(spikes: list[ScoredItem]) -> str:
         return f"🟢 No breaking spikes right now — {now}"
     lines = [f"🚨 *Breaking / Spike Items* — {now}\n"]
     for item in spikes:
-        title = item.title[:90] + ("…" if len(item.title) > 90 else "")
+        title = _escape_md(item.title[:90] + ("…" if len(item.title) > 90 else ""))
         lines.append(f"🔴 *[{item.source}]* {title}")
         lines.append(f"└ Score: {item.confidence_score}/100 | raw: {item.raw_score} | {item.url}\n")
     return "\n".join(lines)
