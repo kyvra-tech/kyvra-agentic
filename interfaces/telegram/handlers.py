@@ -127,7 +127,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     total = len(ctx.raw_items)
     text = format_update(ctx.top_items, total)
     await msg.delete()
-    await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
+    await update.message.reply_text(text, disable_web_page_preview=True)
 
 
 async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -144,7 +144,7 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     spikes = [i for i in ctx.scored_items if i.is_spike]
     text = format_breaking(spikes)
     await msg.delete()
-    await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
+    await update.message.reply_text(text, disable_web_page_preview=True)
 
 
 async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -1,15 +1,9 @@
 from datetime import datetime, timezone, timedelta
-import re
 from agents.base import ScoredItem
 
 _VN_TZ = timezone(timedelta(hours=7))
 _SPIKE_LABEL = "🔴 SPIKE"
 _SCORE_EMOJI = {80: "📈", 60: "🟡", 0: "⬜"}
-
-
-def _escape_md(text: str) -> str:
-    """Escape Markdown special characters in plain text."""
-    return re.sub(r"([*_`\[\]])", r"\\\1", text)
 
 
 def _score_emoji(score: int) -> str:
@@ -21,15 +15,14 @@ def _score_emoji(score: int) -> str:
 
 def format_update(items: list[ScoredItem], total_fetched: int) -> str:
     now = datetime.now(_VN_TZ).strftime("%H:%M GMT+7")
-    lines = [f"⚡ *Quick Update* — {now}", f"_{total_fetched} items scanned across all sources_\n"]
+    lines = [f"⚡ Quick Update — {now}", f"{total_fetched} items scanned across all sources\n"]
     for item in items[:7]:
         spike = f" {_SPIKE_LABEL}" if item.is_spike else ""
         emoji = _score_emoji(item.confidence_score)
-        source_tag = f"[{item.source}]"
-        title = _escape_md(item.title[:80] + ("…" if len(item.title) > 80 else ""))
-        lines.append(f"{emoji}{spike} *{source_tag}* {title}")
+        title = item.title[:80] + ("…" if len(item.title) > 80 else "")
+        lines.append(f"{emoji}{spike} [{item.source}] {title}")
         lines.append(f"└ Score: {item.confidence_score}/100 | {item.url}\n")
-    lines.append("_Use /report for full AI\\-written analysis_")
+    lines.append("Use /report for full AI-written analysis")
     return "\n".join(lines)
 
 
@@ -37,10 +30,10 @@ def format_breaking(spikes: list[ScoredItem]) -> str:
     now = datetime.now(_VN_TZ).strftime("%H:%M GMT+7")
     if not spikes:
         return f"🟢 No breaking spikes right now — {now}"
-    lines = [f"🚨 *Breaking / Spike Items* — {now}\n"]
+    lines = [f"🚨 Breaking / Spike Items — {now}\n"]
     for item in spikes:
-        title = _escape_md(item.title[:90] + ("…" if len(item.title) > 90 else ""))
-        lines.append(f"🔴 *[{item.source}]* {title}")
+        title = item.title[:90] + ("…" if len(item.title) > 90 else "")
+        lines.append(f"🔴 [{item.source}] {title}")
         lines.append(f"└ Score: {item.confidence_score}/100 | raw: {item.raw_score} | {item.url}\n")
     return "\n".join(lines)
 
