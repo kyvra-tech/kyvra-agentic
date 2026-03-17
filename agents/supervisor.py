@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import logging
 from agents.base import PipelineContext
 from agents.data_collector import DataCollectorAgent
@@ -32,8 +33,8 @@ class SupervisorAgent:
         ctx = await self.collector.run(ctx)
 
         analyst_ctx, scout_ctx = await asyncio.gather(
-            self.analyst.run(ctx),
-            self.scout.run(ctx),
+            self.analyst.run(copy.copy(ctx)),
+            self.scout.run(copy.copy(ctx)),
         )
         ctx.scored_items  = analyst_ctx.scored_items
         ctx.top_items     = analyst_ctx.top_items
@@ -60,6 +61,9 @@ class SupervisorAgent:
 
         if ctx.errors:
             logger.warning(f"[Supervisor] {len(ctx.errors)} error(s): {ctx.errors}")
+            footer = f"\n\n⚠️ _{len(ctx.errors)} source(s) had issues and were skipped._"
+            report = ctx.report_text or "Không thể tạo report."
+            return report + footer
         logger.info("[Supervisor] Pipeline complete.")
         return ctx.report_text or "Không thể tạo report."
 

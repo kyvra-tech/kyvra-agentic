@@ -51,6 +51,7 @@ jobs:
             cat > .env << 'EOF'
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             XAI_API_KEY=${{ secrets.XAI_API_KEY }}
+            X_BEARER_TOKEN=${{ secrets.X_BEARER_TOKEN }}
             NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}
             PRODUCT_HUNT_API_KEY=${{ secrets.PRODUCT_HUNT_API_KEY }}
             REPORT_CHAT_IDS=${{ secrets.REPORT_CHAT_IDS }}

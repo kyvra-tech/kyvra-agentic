@@ -4,10 +4,6 @@ from agents.base import BaseAgent, PipelineContext
 from modules.base import RawItem
 from utils.api_client import fetch_source
 
-# X sources are pre-filtered by their API query (account curation or min_faves).
-# Applying keyword filter on top would drop conversational tweets that are genuinely relevant.
-_KEYWORD_FILTER_BYPASS = {"X - AI Leaders", "X - AI Trending", "X - Indie Dev"}
-
 
 def _dedup_with_cross_source(items: list[RawItem]) -> list[RawItem]:
     """Group items covering the same story, pick the best one, record source count.
@@ -60,10 +56,11 @@ class DataCollectorAgent(BaseAgent):
                 continue
             all_items.extend(result)
 
-        # Keyword relevance filter — bypassed for pre-curated X sources
+        # Keyword relevance filter — bypassed for pre-curated sources (bypass_keyword_filter=True)
+        source_bypass = {src.name for src in sources if src.bypass_keyword_filter}
         filtered: list[RawItem] = []
         for item in all_items:
-            if item.source in _KEYWORD_FILTER_BYPASS:
+            if item.source in source_bypass:
                 filtered.append(item)
             else:
                 text = (item.title + " " + item.summary).lower()

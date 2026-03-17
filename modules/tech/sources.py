@@ -17,6 +17,7 @@ class TechModule(BaseModule):
                 source_type="x",
                 params={"query": _X_LEADER_QUERY, "max_results": 10},
                 authority_score=SOURCE_AUTHORITY["X - AI Leaders"],
+                bypass_keyword_filter=True,
             ),
             DataSource(
                 name="X - AI Trending",
@@ -27,6 +28,7 @@ class TechModule(BaseModule):
                     "max_results": 10,
                 },
                 authority_score=SOURCE_AUTHORITY["X - AI Trending"],
+                bypass_keyword_filter=True,
             ),
             DataSource(
                 name="X - Indie Dev",
@@ -37,6 +39,7 @@ class TechModule(BaseModule):
                     "max_results": 10,
                 },
                 authority_score=SOURCE_AUTHORITY["X - Indie Dev"],
+                bypass_keyword_filter=True,
             ),
             # --- Supplementary sources ---
             DataSource(
