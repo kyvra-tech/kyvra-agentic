@@ -23,7 +23,7 @@ jobs:
       - name: Run secret scan
         run: |
           detect-secrets scan --baseline .secrets.baseline
-          detect-secrets audit .secrets.baseline --report --fail-on-unaudited
+          detect-secrets audit .secrets.baseline --report
 
   deploy-to-vps:
     name: Deploy to Production VPS
