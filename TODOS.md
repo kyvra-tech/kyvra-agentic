@@ -1,7 +1,7 @@
 # TODOS — Kyvra Agentic
 
 Deferred work from engineering reviews. Items are ordered by priority within each phase.
-Last updated: 2026-03-17
+Last updated: 2026-03-17 (X expansion + crypto module shipped)
 
 ---
 
@@ -130,11 +130,8 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 
 ## Phase 3 — Growth
 
-### T-013: load_module() registry pattern
-**What:** Replace the `if/elif` chain in `agents/supervisor.py:load_module()` with a dict registry: `MODULE_REGISTRY = {"tech": TechModule, "crypto": CryptoModule, ...}`. `load_module(name)` becomes a one-liner.
-**Why:** At 4 modules (tech/crypto/vietnam/indie), the elif chain needs 4 code changes to add modules. The architecture constraint says "adding a new niche = zero agent changes" — this closes the gap.
-**Effort:** S
-**Priority:** P2
+### T-013: load_module() registry pattern ✅ DONE
+Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new module now = add one line to the registry dict.
 
 ---
 
@@ -191,3 +188,32 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 **Context:** All these functions are pure Python with no I/O — no mocking needed. Start with `pytest` + simple `RawItem` fixtures.
 **Effort:** M
 **Priority:** P2
+
+---
+
+## Phase X — Crypto module follow-ups (post-ship)
+
+### T-020: /module command — switch active module at runtime
+**What:** Add a `/module [tech|crypto]` command handler in `interfaces/telegram/handlers.py`. Store the active module per user (or globally for single-user deploy) in a module-level var. Load the new module on next pipeline run.
+**Why:** Currently switching modules requires editing `.env` + restarting. A `/module crypto` command makes it instant. Essential for demo-ing the crypto module.
+**Effort:** S
+**Priority:** P1 (crypto module ships, needs runtime switch)
+**File:** `interfaces/telegram/handlers.py`, `agents/supervisor.py`
+
+---
+
+### T-021: Crypto spike threshold tuning
+**What:** `X_SPIKE_THRESHOLD = 300` in `modules/crypto/config.py` is a first estimate. After 1 week of real data, tune this based on observed like distributions for CT posts.
+**Why:** If set too low, `/breaking` floods with noise. Too high, real spikes are missed.
+**Effort:** S
+**Priority:** P2
+**Context:** Check logs for `is_spike=True` hit rate — target ~1-3 spikes/day in normal market conditions.
+
+---
+
+### T-022: NarrativeScoutAgent crypto topics
+**What:** Add a `CRYPTO_TREND_TOPICS` dict to `agents/narrative_scout.py` (or make topics module-aware via `ctx.module`). Current topics (AI Agents, LLM, OpenAI...) are meaningless for the crypto module.
+**Why:** The trend heatmap in crypto reports currently shows tech topics. Crypto needs: Bitcoin, DeFi, Layer 2, Regulation, Stablecoins.
+**Effort:** S
+**Priority:** P2
+**File:** `agents/narrative_scout.py` — pass `ctx.module.name` to select topic set

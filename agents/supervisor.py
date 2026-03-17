@@ -55,17 +55,17 @@ class SupervisorAgent:
         ctx = await self._collect_and_score()
 
         if not ctx.raw_items:
-            return "Không có tin tức hôm nay. Thử lại sau!"
+            return "No news today. Try again later!"
 
         ctx = await self.writer.run(ctx)
 
         if ctx.errors:
             logger.warning(f"[Supervisor] {len(ctx.errors)} error(s): {ctx.errors}")
             footer = f"\n\n⚠️ _{len(ctx.errors)} source(s) had issues and were skipped._"
-            report = ctx.report_text or "Không thể tạo report."
+            report = ctx.report_text or "Could not generate report."
             return report + footer
         logger.info("[Supervisor] Pipeline complete.")
-        return ctx.report_text or "Không thể tạo report."
+        return ctx.report_text or "Could not generate report."
 
     async def generate_report_for_topic(self, topic: str) -> str:
         """Full pipeline scoped to items matching a topic keyword."""
@@ -81,14 +81,21 @@ class SupervisorAgent:
         ctx.top_items = ctx.scored_items[:7]
 
         if not ctx.top_items:
-            return f"Không tìm thấy tin nào về *{topic}* hôm nay."
+            return f"No news found for *{topic}* today."
 
         ctx = await self.writer.run(ctx)
-        return ctx.report_text or "Không thể tạo report."
+        return ctx.report_text or "Could not generate report."
 
 
 def load_module(module_name: str) -> BaseModule:
-    if module_name == "tech":
-        from modules.tech.sources import TechModule
-        return TechModule()
-    raise ValueError(f"Unknown module: {module_name}")
+    from modules.tech.sources import TechModule
+    from modules.crypto.sources import CryptoModule
+
+    registry: dict[str, type[BaseModule]] = {
+        "tech":   TechModule,
+        "crypto": CryptoModule,
+    }
+    cls = registry.get(module_name)
+    if cls is None:
+        raise ValueError(f"Unknown module: '{module_name}'. Available: {list(registry)}")
+    return cls()

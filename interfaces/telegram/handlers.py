@@ -15,15 +15,15 @@ MAX_HISTORY = 10  # keep last N turns
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "👋 Hey! I'm *Kyvra* – your AI content agent for Tech, AI & Indie Dev.\n\n"
-        "I monitor X/Twitter, GitHub Trending, Anthropic, OpenAI and DeepMind "
+        "👋 Hey! I'm *Kyvra* – your AI content agent for Tech, AI & Crypto.\n\n"
+        "I monitor X/Twitter, GitHub Trending, top blogs and crypto media, "
         "then distill it into a daily briefing with content angles every morning at 8 AM.\n\n"
         "*Commands:*\n"
         "/update – Fast news scan right now (no AI, ~10 sec)\n"
         "/breaking – Spike alerts only\n"
         "/topic [kw] – Report scoped to one topic\n"
         "/report – Full AI-written daily report\n"
-        "/chat [msg] – Chat about tech news\n\n"
+        "/chat [msg] – Chat about today's news\n\n"
         "Try `/update` for a quick check! ⚡"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
@@ -31,13 +31,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "*Kyvra – AI Tech Content Agent*\n\n"
+        "*Kyvra – AI Content Agent*\n\n"
         "⚡ */update* – Fast scan, top scored items, no AI writing (~10 sec)\n"
-        "🚨 */breaking* – Spike items only (viral X tweets, GitHub trending)\n"
+        "🚨 */breaking* – Spike items only (viral X tweets, trending signals)\n"
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
-        "   e.g. `/topic openai` `/topic agent` `/topic indie`\n"
+        "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
-        "💬 */chat [question]* – Chat about tech news\n"
+        "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "   e.g. `/chat Write a Twitter thread about AI agents`\n\n"
         "📅 Auto-report every day at *8:00 AM* (GMT+7)"
@@ -54,7 +54,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         report = await supervisor.generate_report()
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
-        await msg.edit_text("❌ Không thể tạo report lúc này. Thử lại sau!")
+        await msg.edit_text("❌ Could not generate report. Please try again later.")
         return
 
     await msg.delete()
@@ -71,7 +71,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Quick scan failed: {e}")
-        await msg.edit_text("❌ Scan failed. Thử lại sau!")
+        await msg.edit_text("❌ Scan failed. Please try again.")
         return
 
     total = len(ctx.raw_items)
@@ -89,7 +89,7 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Breaking scan failed: {e}")
-        await msg.edit_text("❌ Scan failed. Thử lại sau!")
+        await msg.edit_text("❌ Scan failed. Please try again.")
         return
 
     spikes = [i for i in ctx.scored_items if i.is_spike]
@@ -103,7 +103,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     topic = " ".join(context.args)[:200].replace("\n", " ").strip() if context.args else ""
     if not topic:
         await update.message.reply_text(
-            "Usage: `/topic [keyword]`\nExamples:\n`/topic openai`\n`/topic agent`\n`/topic indie`",
+            "Usage: `/topic [keyword]`\nExamples:\n`/topic openai`\n`/topic bitcoin`\n`/topic defi`",
             parse_mode="Markdown",
         )
         return
@@ -115,7 +115,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         report = await supervisor.generate_report_for_topic(topic)
     except Exception as e:
         logger.error(f"Topic report failed for '{topic}': {e}")
-        await msg.edit_text("❌ Không thể tạo report. Thử lại sau!")
+        await msg.edit_text("❌ Could not generate report. Please try again.")
         return
 
     await msg.delete()
@@ -135,11 +135,11 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     history = _chat_histories.get(user_id, [])
-
     typing_msg = await update.message.reply_text("💭 Thinking...")
 
-    from modules.tech.prompts import CHAT_SYSTEM_PROMPT
-    reply = await chat_with_llm(user_message, CHAT_SYSTEM_PROMPT, history)
+    # Use the active module's chat system prompt — works for both tech and crypto
+    module = load_module(ACTIVE_MODULE)
+    reply = await chat_with_llm(user_message, module.get_chat_system_prompt(), history)
 
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": reply})

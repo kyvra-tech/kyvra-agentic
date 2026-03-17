@@ -7,7 +7,7 @@ class ContentWriterAgent(BaseAgent):
 
     async def run(self, ctx: PipelineContext) -> PipelineContext:
         if not ctx.top_items:
-            ctx.report_text = "Không có tin tức đủ điểm hôm nay. Thử lại sau! 🤷"
+            ctx.report_text = "No scored items today. Try again later! 🤷"
             return ctx
 
         enriched = [
@@ -33,7 +33,7 @@ class ContentWriterAgent(BaseAgent):
             self._log("Report generated successfully.")
         except Exception as e:
             self._record_error(ctx, f"LLM call failed: {e}")
-            ctx.report_text = "Không thể tạo report lúc này. Thử lại sau! 🤷"
+            ctx.report_text = "Could not generate report right now. Try again later! 🤷"
 
         return ctx
 
@@ -50,4 +50,4 @@ async def chat_with_llm(
     try:
         return await llm.chat(messages, max_tokens=1000)
     except Exception as e:
-        return f"Lỗi kết nối AI: {e}"
+        return f"AI connection error. Please try again later."
