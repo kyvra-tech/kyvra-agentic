@@ -24,7 +24,7 @@ class TechModule(BaseModule):
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
                 params={
-                    "query": "(AI agent OR LLM OR Claude OR Gemini OR GPT) -is:retweet lang:en min_faves:100",
+                    "query": "(AI agent OR LLM OR Claude OR Gemini OR GPT) -is:retweet lang:en",
                     "max_results": 10,
                 },
                 authority_score=SOURCE_AUTHORITY["X - AI Trending"],
@@ -35,7 +35,7 @@ class TechModule(BaseModule):
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
                 params={
-                    "query": "(\"just launched\" OR \"just shipped\" OR \"I built\" OR \"indie hacker\") -is:retweet lang:en min_faves:50",
+                    "query": "(\"just launched\" OR \"just shipped\" OR \"I built\" OR \"indie hacker\") -is:retweet lang:en",
                     "max_results": 10,
                 },
                 authority_score=SOURCE_AUTHORITY["X - Indie Dev"],
@@ -48,12 +48,6 @@ class TechModule(BaseModule):
                 source_type="scrape",
                 params={"language": "", "since": "daily"},
                 authority_score=SOURCE_AUTHORITY["GitHub Trending"],
-            ),
-            DataSource(
-                name="Anthropic Blog",
-                url="https://www.anthropic.com/rss.xml",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["Anthropic Blog"],
             ),
             DataSource(
                 name="OpenAI Blog",
