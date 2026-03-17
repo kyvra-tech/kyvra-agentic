@@ -9,6 +9,7 @@ class DataSource:
     source_type: str  # "rss" | "rest" | "scrape"
     params: dict = field(default_factory=dict)
     authority_score: int = 10  # 0-20, added to confidence scoring
+    bypass_keyword_filter: bool = False  # True for pre-curated sources (e.g. X queries)
 
 
 @dataclass

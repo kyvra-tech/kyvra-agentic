@@ -32,7 +32,7 @@ async def complete(prompt: str, max_tokens: int = 2000) -> str:
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or ""
 
 
 async def chat(messages: list[dict], max_tokens: int = 1000) -> str:
@@ -43,4 +43,4 @@ async def chat(messages: list[dict], max_tokens: int = 1000) -> str:
         max_tokens=max_tokens,
         messages=messages,
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or ""

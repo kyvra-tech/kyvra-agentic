@@ -54,7 +54,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         report = await supervisor.generate_report()
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
-        await msg.edit_text(f"❌ Failed to generate report: {e}")
+        await msg.edit_text("❌ Không thể tạo report lúc này. Thử lại sau!")
         return
 
     await msg.delete()
@@ -71,7 +71,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Quick scan failed: {e}")
-        await msg.edit_text(f"❌ Scan failed: {e}")
+        await msg.edit_text("❌ Scan failed. Thử lại sau!")
         return
 
     total = len(ctx.raw_items)
@@ -89,7 +89,7 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Breaking scan failed: {e}")
-        await msg.edit_text(f"❌ Scan failed: {e}")
+        await msg.edit_text("❌ Scan failed. Thử lại sau!")
         return
 
     spikes = [i for i in ctx.scored_items if i.is_spike]
@@ -100,7 +100,7 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/topic [keyword] — full AI report scoped to one topic."""
-    topic = " ".join(context.args).strip() if context.args else ""
+    topic = " ".join(context.args)[:200].replace("\n", " ").strip() if context.args else ""
     if not topic:
         await update.message.reply_text(
             "Usage: `/topic [keyword]`\nExamples:\n`/topic openai`\n`/topic agent`\n`/topic indie`",
@@ -115,7 +115,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         report = await supervisor.generate_report_for_topic(topic)
     except Exception as e:
         logger.error(f"Topic report failed for '{topic}': {e}")
-        await msg.edit_text(f"❌ Failed: {e}")
+        await msg.edit_text("❌ Không thể tạo report. Thử lại sau!")
         return
 
     await msg.delete()
@@ -125,7 +125,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    user_message = " ".join(context.args) if context.args else ""
+    user_message = " ".join(context.args)[:500].replace("\n", " ").strip() if context.args else ""
 
     if not user_message:
         await update.message.reply_text(

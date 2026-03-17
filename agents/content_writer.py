@@ -33,7 +33,7 @@ class ContentWriterAgent(BaseAgent):
             self._log("Report generated successfully.")
         except Exception as e:
             self._record_error(ctx, f"LLM call failed: {e}")
-            ctx.report_text = f"Lỗi khi tạo report: {e}"
+            ctx.report_text = "Không thể tạo report lúc này. Thử lại sau! 🤷"
 
         return ctx
 
