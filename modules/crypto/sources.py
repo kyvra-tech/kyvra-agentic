@@ -1,17 +1,38 @@
 from modules.base import BaseModule, DataSource
 from modules.crypto.config import (
     KEYWORDS, SOURCE_AUTHORITY,
-    X_CRYPTO_LEADER_ACCOUNTS, X_CRYPTO_MACRO_ACCOUNTS,
+    X_CRYPTO_GLOBAL_LEADERS, X_BITCOIN_MACRO,
+    X_ETHEREUM_DEFI, X_SOLANA_ALT_L1,
+    X_CRYPTO_MACRO_ACCOUNTS, X_VIETNAM_CRYPTO,
 )
 from modules.crypto import prompts
 
-_X_LEADER_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_CRYPTO_LEADER_ACCOUNTS)
+# Build from: account queries — English global feeds
+_X_GLOBAL_LEADERS_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_CRYPTO_GLOBAL_LEADERS)
+    + " -is:retweet lang:en"
+)
+_X_BTC_MACRO_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_BITCOIN_MACRO)
+    + " -is:retweet lang:en"
+)
+_X_ETH_DEFI_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_ETHEREUM_DEFI)
+    + " -is:retweet lang:en"
+)
+_X_SOL_L1_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_SOLANA_ALT_L1)
     + " -is:retweet lang:en"
 )
 _X_MACRO_QUERY = (
     " OR ".join(f"from:{a}" for a in X_CRYPTO_MACRO_ACCOUNTS)
     + " -is:retweet lang:en"
+)
+
+# Vietnam: include both English and Vietnamese tweets from known accounts
+_X_VIETNAM_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_VIETNAM_CRYPTO)
+    + " -is:retweet"
 )
 
 
@@ -20,13 +41,38 @@ class CryptoModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # --- X: account-based (pre-curated, bypass keyword filter) ---
+            # ── X: account-based, primary signal ──────────────────────────
+            # These are pre-curated trusted accounts — bypass keyword filter
             DataSource(
-                name="X - Crypto Leaders",
+                name="X - Crypto Global Leaders",
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
-                params={"query": _X_LEADER_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Crypto Leaders"],
+                params={"query": _X_GLOBAL_LEADERS_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Crypto Global Leaders"],
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="X - Bitcoin & Macro",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_BTC_MACRO_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Bitcoin & Macro"],
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="X - Ethereum & DeFi",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_ETH_DEFI_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Ethereum & DeFi"],
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="X - Solana & Alt-L1",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_SOL_L1_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Solana & Alt-L1"],
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -37,7 +83,16 @@ class CryptoModule(BaseModule):
                 authority_score=SOURCE_AUTHORITY["X - Crypto Macro"],
                 bypass_keyword_filter=True,
             ),
-            # --- X: keyword-based (signal discovery) ---
+            # ── X: Vietnam crypto community ────────────────────────────────
+            DataSource(
+                name="X - Vietnam Crypto",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_VIETNAM_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Vietnam Crypto"],
+                bypass_keyword_filter=True,
+            ),
+            # ── X: keyword-based signal discovery ─────────────────────────
             DataSource(
                 name="X - DeFi",
                 url="https://api.twitter.com/2/tweets/search/recent",
@@ -50,46 +105,15 @@ class CryptoModule(BaseModule):
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="X - Web3 / NFT",
+                name="X - Web3 / L2",
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
                 params={
                     "query": "(L2 OR rollup OR \"zk proof\" OR \"smart contract\" OR web3) -is:retweet lang:en",
                     "max_results": 10,
                 },
-                authority_score=SOURCE_AUTHORITY["X - Web3 / NFT"],
+                authority_score=SOURCE_AUTHORITY["X - Web3 / L2"],
                 bypass_keyword_filter=True,
-            ),
-            # --- RSS: authoritative crypto media ---
-            DataSource(
-                name="CoinDesk",
-                url="https://www.coindesk.com/arc/outboundfeeds/rss/",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["CoinDesk"],
-            ),
-            DataSource(
-                name="Cointelegraph",
-                url="https://cointelegraph.com/rss",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["Cointelegraph"],
-            ),
-            DataSource(
-                name="The Block",
-                url="https://www.theblock.co/rss.xml",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["The Block"],
-            ),
-            DataSource(
-                name="Bitcoin Magazine",
-                url="https://bitcoinmagazine.com/.rss/full/",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["Bitcoin Magazine"],
-            ),
-            DataSource(
-                name="Decrypt",
-                url="https://decrypt.co/feed",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["Decrypt"],
             ),
         ]
 
