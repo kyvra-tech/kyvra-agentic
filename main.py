@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler
 from config import TELEGRAM_BOT_TOKEN, XAI_API_KEY
 from interfaces.telegram.handlers import (
     cmd_start, cmd_help, cmd_report, cmd_chat, error_handler,
-    cmd_update, cmd_breaking, cmd_topic,
+    cmd_update, cmd_breaking, cmd_topic, cmd_module,
 )
 from interfaces.telegram.scheduler import setup_scheduler
 
@@ -36,6 +36,7 @@ def main() -> None:
     app.add_handler(CommandHandler("breaking", cmd_breaking))
     app.add_handler(CommandHandler("topic",    cmd_topic))
     app.add_handler(CommandHandler("chat",     cmd_chat))
+    app.add_handler(CommandHandler("module",   cmd_module))
     app.add_error_handler(error_handler)
 
     # Setup daily report scheduler

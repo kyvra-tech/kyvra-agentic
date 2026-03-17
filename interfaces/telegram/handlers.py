@@ -8,9 +8,60 @@ from config import ACTIVE_MODULE
 
 logger = logging.getLogger(__name__)
 
+# Runtime module state — starts from .env, changed by /module command without restart
+_active_module: str = ACTIVE_MODULE
+AVAILABLE_MODULES = ["tech", "crypto"]
+
 # Per-user chat history for /chat command (in-memory, resets on restart)
 _chat_histories: dict[int, list[dict]] = {}
 MAX_HISTORY = 10  # keep last N turns
+
+
+def _get_module():
+    """Return a fresh module instance using the current runtime selection."""
+    return load_module(_active_module)
+
+
+async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/module [name] — switch active module at runtime, no restart needed."""
+    global _active_module
+
+    requested = context.args[0].lower().strip() if context.args else ""
+
+    # No argument → show current status
+    if not requested:
+        options = " | ".join(f"`{m}`" for m in AVAILABLE_MODULES)
+        await update.message.reply_text(
+            f"🧩 Active module: *{_active_module}*\n\nAvailable: {options}\n\nUsage: `/module crypto`",
+            parse_mode="Markdown",
+        )
+        return
+
+    if requested not in AVAILABLE_MODULES:
+        options = " | ".join(f"`{m}`" for m in AVAILABLE_MODULES)
+        await update.message.reply_text(
+            f"❌ Unknown module: `{requested}`\n\nAvailable: {options}",
+            parse_mode="Markdown",
+        )
+        return
+
+    if requested == _active_module:
+        await update.message.reply_text(
+            f"✅ Already on *{_active_module}* module.",
+            parse_mode="Markdown",
+        )
+        return
+
+    _active_module = requested
+    logger.info(f"[Module] Switched to '{_active_module}' by user {update.effective_user.id}")
+
+    # Clear all chat histories — old context is invalid for the new module
+    _chat_histories.clear()
+
+    await update.message.reply_text(
+        f"✅ Switched to *{_active_module}* module.\nChat history cleared. Run `/report` for today's briefing.",
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -23,7 +74,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/breaking – Spike alerts only\n"
         "/topic [kw] – Report scoped to one topic\n"
         "/report – Full AI-written daily report\n"
-        "/chat [msg] – Chat about today's news\n\n"
+        "/chat [msg] – Chat about today's news\n"
+        "/module [tech|crypto] – Switch focus module\n\n"
         "Try `/update` for a quick check! ⚡"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
@@ -31,7 +83,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "*Kyvra – AI Content Agent*\n\n"
+        f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n\n"
         "⚡ */update* – Fast scan, top scored items, no AI writing (~10 sec)\n"
         "🚨 */breaking* – Spike items only (viral X tweets, trending signals)\n"
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
@@ -39,7 +91,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
-        "   e.g. `/chat Write a Twitter thread about AI agents`\n\n"
+        "🧩 */module [tech|crypto]* – Switch active module\n\n"
         "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
@@ -49,8 +101,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     msg = await update.message.reply_text("⏳ Gathering news and writing report... (30-60 sec)")
 
     try:
-        module = load_module(ACTIVE_MODULE)
-        supervisor = SupervisorAgent(module)
+        supervisor = SupervisorAgent(_get_module())
         report = await supervisor.generate_report()
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
@@ -66,8 +117,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     """/update — fast scan, no LLM, shows top scored items immediately."""
     msg = await update.message.reply_text("⚡ Scanning latest news... (no AI writing, ~10 sec)")
     try:
-        module = load_module(ACTIVE_MODULE)
-        supervisor = SupervisorAgent(module)
+        supervisor = SupervisorAgent(_get_module())
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Quick scan failed: {e}")
@@ -84,8 +134,7 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """/breaking — only spike items, instant alert, no LLM."""
     msg = await update.message.reply_text("🚨 Checking for spikes...")
     try:
-        module = load_module(ACTIVE_MODULE)
-        supervisor = SupervisorAgent(module)
+        supervisor = SupervisorAgent(_get_module())
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Breaking scan failed: {e}")
@@ -110,8 +159,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     msg = await update.message.reply_text(f"🔍 Finding news about *{topic}*...", parse_mode="Markdown")
     try:
-        module = load_module(ACTIVE_MODULE)
-        supervisor = SupervisorAgent(module)
+        supervisor = SupervisorAgent(_get_module())
         report = await supervisor.generate_report_for_topic(topic)
     except Exception as e:
         logger.error(f"Topic report failed for '{topic}': {e}")
@@ -137,9 +185,7 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     history = _chat_histories.get(user_id, [])
     typing_msg = await update.message.reply_text("💭 Thinking...")
 
-    # Use the active module's chat system prompt — works for both tech and crypto
-    module = load_module(ACTIVE_MODULE)
-    reply = await chat_with_llm(user_message, module.get_chat_system_prompt(), history)
+    reply = await chat_with_llm(user_message, _get_module().get_chat_system_prompt(), history)
 
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": reply})

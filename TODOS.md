@@ -193,12 +193,9 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ## Phase X — Crypto module follow-ups (post-ship)
 
-### T-020: /module command — switch active module at runtime
-**What:** Add a `/module [tech|crypto]` command handler in `interfaces/telegram/handlers.py`. Store the active module per user (or globally for single-user deploy) in a module-level var. Load the new module on next pipeline run.
-**Why:** Currently switching modules requires editing `.env` + restarting. A `/module crypto` command makes it instant. Essential for demo-ing the crypto module.
-**Effort:** S
-**Priority:** P1 (crypto module ships, needs runtime switch)
-**File:** `interfaces/telegram/handlers.py`, `agents/supervisor.py`
+### T-020: /module command — switch active module at runtime ✅ DONE
+`/module [tech|crypto]` switches the active module instantly, no restart needed.
+Clears chat history on switch (stale context). `/module` with no args shows current status.
 
 ---
 
