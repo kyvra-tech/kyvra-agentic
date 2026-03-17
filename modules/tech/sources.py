@@ -1,12 +1,26 @@
 from modules.base import BaseModule, DataSource
 from modules.tech.config import (
     KEYWORDS, SOURCE_AUTHORITY,
-    X_AI_LEADER_ACCOUNTS, X_AI_RESEARCH_ACCOUNTS,
+    X_AI_LAB_ACCOUNTS, X_AI_LEADER_ACCOUNTS,
+    X_SOFTWARE_ENG_ACCOUNTS, X_INDIE_BUILDER_ACCOUNTS,
+    X_AI_RESEARCH_ACCOUNTS,
 )
 from modules.tech import prompts
 
-_X_LEADER_QUERY = (
+_X_LABS_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_AI_LAB_ACCOUNTS)
+    + " -is:retweet lang:en"
+)
+_X_LEADERS_QUERY = (
     " OR ".join(f"from:{a}" for a in X_AI_LEADER_ACCOUNTS)
+    + " -is:retweet lang:en"
+)
+_X_SWE_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_SOFTWARE_ENG_ACCOUNTS)
+    + " -is:retweet lang:en"
+)
+_X_INDIE_QUERY = (
+    " OR ".join(f"from:{a}" for a in X_INDIE_BUILDER_ACCOUNTS)
     + " -is:retweet lang:en"
 )
 _X_RESEARCH_QUERY = (
@@ -20,13 +34,37 @@ class TechModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # --- X: account-based (pre-curated, bypass keyword filter) ---
+            # ── X: account-based, primary signal ──────────────────────────
+            DataSource(
+                name="X - AI Labs",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_LABS_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - AI Labs"],
+                bypass_keyword_filter=True,
+            ),
             DataSource(
                 name="X - AI Leaders",
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
-                params={"query": _X_LEADER_QUERY, "max_results": 10},
+                params={"query": _X_LEADERS_QUERY, "max_results": 10},
                 authority_score=SOURCE_AUTHORITY["X - AI Leaders"],
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="X - Software Eng",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_SWE_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Software Eng"],
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="X - Indie Builders",
+                url="https://api.twitter.com/2/tweets/search/recent",
+                source_type="x",
+                params={"query": _X_INDIE_QUERY, "max_results": 10},
+                authority_score=SOURCE_AUTHORITY["X - Indie Builders"],
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -37,7 +75,7 @@ class TechModule(BaseModule):
                 authority_score=SOURCE_AUTHORITY["X - AI Research"],
                 bypass_keyword_filter=True,
             ),
-            # --- X: keyword-based (signal discovery) ---
+            # ── X: keyword-based signal discovery ─────────────────────────
             DataSource(
                 name="X - AI Trending",
                 url="https://api.twitter.com/2/tweets/search/recent",
@@ -54,7 +92,7 @@ class TechModule(BaseModule):
                 url="https://api.twitter.com/2/tweets/search/recent",
                 source_type="x",
                 params={
-                    "query": "(cursor AI OR copilot OR replit OR \"v0.dev\" OR lovable OR bolt.new) -is:retweet lang:en",
+                    "query": "(cursor AI OR copilot OR replit OR \"v0.dev\" OR lovable OR windsurf) -is:retweet lang:en",
                     "max_results": 10,
                 },
                 authority_score=SOURCE_AUTHORITY["X - AI Tools"],
@@ -71,36 +109,13 @@ class TechModule(BaseModule):
                 authority_score=SOURCE_AUTHORITY["X - OSS"],
                 bypass_keyword_filter=True,
             ),
-            DataSource(
-                name="X - Indie Dev",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={
-                    "query": "(\"just launched\" OR \"just shipped\" OR \"I built\" OR \"indie hacker\") -is:retweet lang:en",
-                    "max_results": 10,
-                },
-                authority_score=SOURCE_AUTHORITY["X - Indie Dev"],
-                bypass_keyword_filter=True,
-            ),
-            # --- Supplementary: authoritative RSS ---
+            # ── GitHub Trending: native dev signal ────────────────────────
             DataSource(
                 name="GitHub Trending",
                 url="https://github.com/trending",
                 source_type="scrape",
                 params={"language": "", "since": "daily"},
                 authority_score=SOURCE_AUTHORITY["GitHub Trending"],
-            ),
-            DataSource(
-                name="OpenAI Blog",
-                url="https://openai.com/news/rss.xml",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["OpenAI Blog"],
-            ),
-            DataSource(
-                name="Google DeepMind Blog",
-                url="https://deepmind.google/blog/rss.xml",
-                source_type="rss",
-                authority_score=SOURCE_AUTHORITY["Google DeepMind Blog"],
             ),
         ]
 
