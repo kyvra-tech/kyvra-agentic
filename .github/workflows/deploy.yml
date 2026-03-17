@@ -25,41 +25,50 @@ jobs:
           detect-secrets scan --baseline .secrets.baseline
           detect-secrets audit .secrets.baseline --report --fail-on-unaudited
 
-  deploy:
-    name: Deploy to server
+  deploy-to-vps:
+    name: Deploy to Production VPS
+    needs: secret-scan
     runs-on: ubuntu-latest
-    needs: secret-scan  # only deploy if scan passes
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            cd ~/agentic-kyvra
+      - name: Deploy to VPS
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          set -e
 
-            # Pull latest code
-            git pull origin main
+          echo "📦 Deploying Kyvra bot..."
+          cd /var/www/kyvra-agentic
 
-            # Install/update dependencies
-            pip install -r requirements.txt
+          echo "🔄 Pulling latest code..."
+          git fetch origin
+          git reset --hard origin/main
 
-            # Write .env from GitHub Secrets
-            cat > .env << 'EOF'
-            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-            XAI_API_KEY=${{ secrets.XAI_API_KEY }}
-            X_BEARER_TOKEN=${{ secrets.X_BEARER_TOKEN }}
-            NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}
-            PRODUCT_HUNT_API_KEY=${{ secrets.PRODUCT_HUNT_API_KEY }}
-            REPORT_CHAT_IDS=${{ secrets.REPORT_CHAT_IDS }}
-            REPORT_TIME=08:00
-            ACTIVE_MODULE=tech
-            GROK_MODEL=grok-3-latest
-            EOF
+          echo "📥 Installing dependencies..."
+          venv/bin/pip install -r requirements.txt
 
-            # Restart bot (assumes systemd service named kyvra-bot)
-            sudo systemctl restart kyvra-bot
-            sudo systemctl status kyvra-bot --no-pager
+          echo "⚙️  Writing .env..."
+          cat > .env << 'ENVEOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          XAI_API_KEY=${{ secrets.XAI_API_KEY }}
+          X_BEARER_TOKEN=${{ secrets.X_BEARER_TOKEN }}
+          NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}
+          PRODUCT_HUNT_API_KEY=${{ secrets.PRODUCT_HUNT_API_KEY }}
+          REPORT_CHAT_IDS=${{ secrets.REPORT_CHAT_IDS }}
+          REPORT_TIME=08:00
+          ACTIVE_MODULE=tech
+          GROK_MODEL=grok-3-latest
+          ENVEOF
+
+          echo "🔄 Restarting service..."
+          sudo systemctl restart kyvra-bot
+
+          echo "✅ Deployment complete!"
+          sudo systemctl status kyvra-bot --no-pager
+          EOF
