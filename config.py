@@ -9,6 +9,8 @@ X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN", "")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 PRODUCT_HUNT_API_KEY = os.getenv("PRODUCT_HUNT_API_KEY", "")
 GROK_MODEL = os.getenv("GROK_MODEL", "grok-3-latest")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 ACTIVE_MODULE = os.getenv("ACTIVE_MODULE", "tech")
 
