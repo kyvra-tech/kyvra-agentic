@@ -4,57 +4,83 @@ LLM service — xAI Grok as primary, Ollama as local fallback.
 Provider selection:
   - XAI_API_KEY set   → xAI Grok (remote)
   - XAI_API_KEY unset → Ollama (local, must be running)
+  - xAI returns 429   → automatically falls back to Ollama
 """
 import logging
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError, APIStatusError
 from config import XAI_API_KEY, GROK_MODEL, OLLAMA_BASE_URL, OLLAMA_MODEL
 
 logger = logging.getLogger(__name__)
 
-_client: AsyncOpenAI | None = None
+_xai_client: AsyncOpenAI | None = None
+_ollama_client: AsyncOpenAI | None = None
 
 
-def _use_ollama() -> bool:
-    return not XAI_API_KEY
+def _get_xai_client() -> AsyncOpenAI:
+    global _xai_client
+    if _xai_client is None:
+        _xai_client = AsyncOpenAI(
+            api_key=XAI_API_KEY,
+            base_url="https://api.x.ai/v1",
+            max_retries=0,
+        )
+    return _xai_client
 
 
-def get_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        if _use_ollama():
-            logger.info(f"[LLM] XAI_API_KEY not set — using Ollama at {OLLAMA_BASE_URL} (model: {OLLAMA_MODEL})")
-            _client = AsyncOpenAI(
-                api_key="ollama",  # pragma: allowlist secret
-                base_url=f"{OLLAMA_BASE_URL}/v1",
-            )
-        else:
-            _client = AsyncOpenAI(
-                api_key=XAI_API_KEY,
-                base_url="https://api.x.ai/v1",
-            )
-    return _client
-
-
-def _model() -> str:
-    return OLLAMA_MODEL if _use_ollama() else GROK_MODEL
+def _get_ollama_client() -> AsyncOpenAI:
+    global _ollama_client
+    if _ollama_client is None:
+        _ollama_client = AsyncOpenAI(
+            api_key="ollama",  # pragma: allowlist secret
+            base_url=f"{OLLAMA_BASE_URL}/v1",
+        )
+    return _ollama_client
 
 
 async def complete(prompt: str, max_tokens: int = 2000) -> str:
-    """Single-turn completion. Returns the response text."""
-    client = get_client()
-    response = await client.chat.completions.create(
-        model=_model(),
+    """Single-turn completion. Falls back to Ollama on xAI 429."""
+    messages = [{"role": "user", "content": prompt}]
+
+    if XAI_API_KEY:
+        try:
+            response = await _get_xai_client().chat.completions.create(
+                model=GROK_MODEL,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+            return response.choices[0].message.content or ""
+        except (RateLimitError, APIStatusError) as e:
+            if isinstance(e, APIStatusError) and e.status_code != 429:
+                raise
+            logger.warning("[LLM] xAI rate limit / credits exhausted — falling back to Ollama")
+
+    logger.info(f"[LLM] Using Ollama ({OLLAMA_MODEL}) at {OLLAMA_BASE_URL}")
+    response = await _get_ollama_client().chat.completions.create(
+        model=OLLAMA_MODEL,
         max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
     )
     return response.choices[0].message.content or ""
 
 
 async def chat(messages: list[dict], max_tokens: int = 1000) -> str:
-    """Multi-turn chat. messages = list of {role, content} dicts."""
-    client = get_client()
-    response = await client.chat.completions.create(
-        model=_model(),
+    """Multi-turn chat. Falls back to Ollama on xAI 429."""
+    if XAI_API_KEY:
+        try:
+            response = await _get_xai_client().chat.completions.create(
+                model=GROK_MODEL,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+            return response.choices[0].message.content or ""
+        except (RateLimitError, APIStatusError) as e:
+            if isinstance(e, APIStatusError) and e.status_code != 429:
+                raise
+            logger.warning("[LLM] xAI rate limit / credits exhausted — falling back to Ollama")
+
+    logger.info(f"[LLM] Using Ollama ({OLLAMA_MODEL}) at {OLLAMA_BASE_URL}")
+    response = await _get_ollama_client().chat.completions.create(
+        model=OLLAMA_MODEL,
         max_tokens=max_tokens,
         messages=messages,
     )
