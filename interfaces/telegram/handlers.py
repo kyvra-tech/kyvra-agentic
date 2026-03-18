@@ -110,7 +110,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     await msg.delete()
     for chunk in split_long_message(report):
-        await update.message.reply_text(chunk, parse_mode="Markdown")
+        await update.message.reply_text(chunk)
 
 
 async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -168,7 +168,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await msg.delete()
     for chunk in split_long_message(report):
-        await update.message.reply_text(chunk, parse_mode="Markdown")
+        await update.message.reply_text(chunk)
 
 
 async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -193,7 +193,7 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await typing_msg.delete()
     for chunk in split_long_message(reply):
-        await update.message.reply_text(chunk, parse_mode="Markdown")
+        await update.message.reply_text(chunk)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
