@@ -98,6 +98,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info(f"[Analytics] user={update.effective_user.id} command=report module={_active_module}")
     msg = await update.message.reply_text("⏳ Gathering news and writing report... (30-60 sec)")
 
     try:
@@ -115,6 +116,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/update — fast scan, no LLM, shows top scored items immediately."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=update module={_active_module}")
     msg = await update.message.reply_text("⚡ Scanning latest news... (no AI writing, ~10 sec)")
     try:
         supervisor = SupervisorAgent(_get_module())
@@ -132,6 +134,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/breaking — only spike items, instant alert, no LLM."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=breaking module={_active_module}")
     msg = await update.message.reply_text("🚨 Checking for spikes...")
     try:
         supervisor = SupervisorAgent(_get_module())
@@ -156,6 +159,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    logger.info(f"[Analytics] user={update.effective_user.id} command=topic module={_active_module} topic={topic!r}")
     msg = await update.message.reply_text(f"🔍 Finding news about {topic}...")
     try:
         supervisor = SupervisorAgent(_get_module())
@@ -172,6 +176,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/brief — 3-bullet shareable summary of today's top stories."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=brief module={_active_module}")
     msg = await update.message.reply_text("⚡ Writing today's brief...")
     try:
         supervisor = SupervisorAgent(_get_module())
@@ -188,6 +193,7 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/thread — generate a 7-tweet Twitter thread from today's top story."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=thread module={_active_module}")
     msg = await update.message.reply_text("🧵 Writing thread from today's top story... (30-60 sec)")
     try:
         supervisor = SupervisorAgent(_get_module())
@@ -212,6 +218,7 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    logger.info(f"[Analytics] user={user_id} command=chat module={_active_module}")
     history = _chat_histories.get(user_id, [])
     typing_msg = await update.message.reply_text("💭 Thinking...")
 
