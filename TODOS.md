@@ -100,14 +100,14 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 
 ---
 
-### T-010: Persistent chat history (SQLite)
-**What:** Create `services/memory.py` with SQLite backend. Two tables: `users(id, created_at)`, `messages(id, user_id, role, content, created_at)`. Replace the in-memory `_chat_histories` dict in `handlers.py` with DB reads/writes.
-**Why:** Chat history resets on every bot restart. For creators using `/chat` as a research assistant, this breaks the relationship. Also the foundation for Phase 5 seen-item suppression and user feedback.
-**Pros:** Persistent chat = better retention. Unlocks full Phase 5 memory features.
-**Cons:** Adds a SQLite dependency. Needs migration strategy if schema changes.
-**Context:** `_chat_histories: dict[int, list[dict]]` in `handlers.py:14` is the current in-memory store. Max 10 turns per user, unbounded users. Start here.
+### T-010: User voice profile — /setvoice command ✅ Schema done
+**What:** `services/memory.py` now exists with `user_voices` SQLite table (`user_id`, `voice`, `updated_at`). Next: build `/setvoice [description]` handler that saves the user's writing style. Inject the voice profile into all content format prompts (`get_thread_prompt`, `get_newsletter_prompt`, `get_script_prompt`, `get_brief_prompt`) via a new optional `voice: str | None` parameter.
+**Why:** The real product differentiation — Kyvra learns *your* voice. A thread from Kyvra should sound like you wrote it, not like generic AI. The SQLite schema is live. This is the next unlock.
+**Pros:** Persistent voice = consistent content. Output quality gap vs. raw ChatGPT. Killer demo for B2C.
+**Cons:** Prompt injection risk if voice field is not sanitised on write (cap at 300 chars, strip control chars — same pattern as T-004).
+**Context:** `services/memory.py` has `save_voice_profile(user_id, voice)` and `get_voice_profile(user_id) -> str | None`. Add `/setvoice` command to `handlers.py`. Load voice in each `generate_*` method in supervisor and append to prompt. `/setvoice` with no args shows current profile.
 **Effort:** M
-**Priority:** P2
+**Priority:** P1
 
 ---
 
@@ -222,3 +222,39 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 **Priority:** P2
 **File:** `agents/narrative_scout.py` — pass `ctx.module.name` to select topic set
 **Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
+
+---
+
+## Phase 4 — Content personalisation
+
+### T-023: Story rank picker for content format commands
+**What:** Add an optional rank argument to `/thread`, `/newsletter`, `/script`. E.g. `/thread 2` generates a thread from the #2 scored story instead of #1. Default remains 1. Cap at 7 (MAX_REPORT_ITEMS).
+**Why:** Users often know which story they want to work with — always using #1 removes agency. Power users will hit this immediately.
+**Pros:** Tiny change (~10 lines in handlers + supervisor). Big UX improvement for repeat users.
+**Cons:** None.
+**Context:** `supervisor.generate_thread()` takes no args. Add `rank: int = 1` param. `handlers.py` passes `int(context.args[0]) if context.args else 1`. Clamp to `[1, len(ctx.top_items)]`.
+**Effort:** S
+**Priority:** P2
+
+---
+
+### T-024: Per-chat-id module mapping in scheduler
+**What:** Allow `REPORT_CHAT_IDS` config to map each chat to a preferred module. E.g. `REPORT_CHAT_IDS=123456:tech,789012:indie`. Scheduler sends only that module's report to each chat.
+**Why:** Enables a personal chat on `indie` and a group chat on `tech` without running two bot instances.
+**Pros:** Multi-tenant feel from a single bot. Zero new infra.
+**Cons:** Config format change — needs migration note in deploy docs.
+**Context:** Currently `REPORT_CHAT_IDS` is a comma-separated list of ints. Extend to optional `id:module` format, fall back to sending all modules if no module specified.
+**Effort:** S
+**Priority:** P3
+
+---
+
+### T-025: /setvoice — user voice profile injection ← P1 NEXT
+**What:** `/setvoice [description]` saves the user's writing style to `user_voices` SQLite table (schema already live in `services/memory.py`). Voice profile is injected into all content format prompts. `/setvoice` with no args shows current profile. `/setvoice clear` resets it.
+**Why:** This is the core product differentiator. Output from `/thread`, `/newsletter`, `/script` should sound like *the user wrote it*, not generic AI. A creator who sets their voice gets dramatically better, shareable content.
+**Pros:** Persistent voice = consistent brand. Zero extra API cost. Immediate perceived quality jump.
+**Cons:** Prompt injection risk — cap voice at 300 chars, strip newlines/control chars on save (same pattern as T-004). Voice prompt adds ~50 tokens to each content format call.
+**Context:** `services/memory.py` exposes `save_voice_profile(user_id, voice)` and `get_voice_profile(user_id)`. Add `/setvoice` handler in `handlers.py`. In `supervisor.generate_thread/newsletter/script/brief`, load voice via `get_voice_profile(user_id)` and append to each module's prompt method (add optional `voice: str | None` param).
+**Effort:** M
+**Priority:** P1
+**Depends on:** T-010 schema (done)

@@ -126,6 +126,12 @@ class CryptoModule(BaseModule):
     def get_brief_prompt(self, items: list[dict]) -> str:
         return prompts.build_brief_prompt(items)
 
+    def get_newsletter_prompt(self, item: dict) -> str:
+        return prompts.build_newsletter_prompt(item)
+
+    def get_script_prompt(self, item: dict) -> str:
+        return prompts.build_script_prompt(item)
+
     def get_chat_system_prompt(self) -> str:
         return prompts.CHAT_SYSTEM_PROMPT
 

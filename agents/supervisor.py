@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import logging
+from collections import Counter
 from agents.base import PipelineContext
 from agents.data_collector import DataCollectorAgent
 from agents.analyst import AnalystAgent
@@ -67,63 +68,87 @@ class SupervisorAgent:
         logger.info("[Supervisor] Pipeline complete.")
         return ctx.report_text or "Could not generate report."
 
-    async def generate_brief(self) -> str:
-        """Generate a 3-bullet shareable brief from today's top 3 items."""
-        logger.info("[Supervisor] Brief generation started...")
+    @staticmethod
+    def _item_dict(item) -> dict:
+        return {
+            "title": item.title,
+            "url": item.url,
+            "source": item.source,
+            "published_at": item.published_at,
+            "summary": item.summary,
+            "confidence_score": item.confidence_score,
+            "is_spike": item.is_spike,
+        }
+
+    async def _generate_content_format(
+        self,
+        format_name: str,
+        get_prompt,
+        max_tokens: int,
+        use_top3: bool = False,
+    ) -> str:
+        """Shared pipeline for single-item (or top-3) content format generation.
+
+        format_name  — label for log lines (e.g. "brief", "thread")
+        get_prompt   — callable: (item_or_items) -> str
+        max_tokens   — passed to LLM
+        use_top3     — True for brief (top-3 items), False for thread/newsletter/script (top-1)
+        """
+        import services.llm as llm
+        logger.info("[Supervisor] %s generation started...", format_name.capitalize())
         ctx = await self._collect_and_score()
 
         if not ctx.top_items:
-            return "No news today to build a brief from. Try again later!"
+            return f"No news today to build a {format_name} from. Try again later!"
 
-        items = [
-            {
-                "title": item.title,
-                "url": item.url,
-                "source": item.source,
-                "published_at": item.published_at,
-                "summary": item.summary,
-                "confidence_score": item.confidence_score,
-                "is_spike": item.is_spike,
-            }
-            for item in ctx.top_items[:3]
-        ]
-        prompt = ctx.module.get_brief_prompt(items)
-        import services.llm as llm
+        if use_top3:
+            payload = [self._item_dict(i) for i in ctx.top_items[:3]]
+        else:
+            payload = self._item_dict(ctx.top_items[0])
+
+        prompt = get_prompt(payload)
         try:
-            brief = await llm.complete(prompt, max_tokens=400)
+            result = await llm.complete(prompt, max_tokens=max_tokens)
         except Exception as e:
-            logger.error(f"Brief LLM call failed: {e}")
-            return "Could not generate brief right now. Try again later!"
-        logger.info("[Supervisor] Brief generated.")
-        return brief
+            logger.error("[Supervisor] %s LLM call failed: %s", format_name, e)
+            return f"Could not generate {format_name} right now. Try again later!"
+        logger.info("[Supervisor] %s generated.", format_name.capitalize())
+        return result
+
+    async def generate_brief(self) -> str:
+        """Generate a 3-bullet shareable brief from today's top 3 items."""
+        return await self._generate_content_format(
+            "brief", lambda items: self.module.get_brief_prompt(items), 400, use_top3=True
+        )
 
     async def generate_thread(self) -> str:
         """Generate a Twitter thread from today's top-scored item."""
-        logger.info("[Supervisor] Thread generation started...")
+        return await self._generate_content_format(
+            "thread", lambda item: self.module.get_thread_prompt(item), 1200
+        )
+
+    async def get_status(self) -> dict:
+        """Collect + score and return a status summary dict."""
         ctx = await self._collect_and_score()
-
-        if not ctx.top_items:
-            return "No news today to build a thread from. Try again later!"
-
-        top = ctx.top_items[0]
-        item = {
-            "title": top.title,
-            "url": top.url,
-            "source": top.source,
-            "published_at": top.published_at,
-            "summary": top.summary,
-            "confidence_score": top.confidence_score,
-            "is_spike": top.is_spike,
+        return {
+            "module": ctx.module.name,
+            "total_fetched": len(ctx.raw_items),
+            "top_score": ctx.top_items[0].confidence_score if ctx.top_items else 0,
+            "spikes": sum(1 for i in ctx.scored_items if i.is_spike),
+            "sources": Counter(item.source for item in ctx.raw_items),
         }
-        prompt = ctx.module.get_thread_prompt(item)
-        import services.llm as llm
-        try:
-            thread = await llm.complete(prompt, max_tokens=1200)
-        except Exception as e:
-            logger.error(f"Thread LLM call failed: {e}")
-            return "Could not generate thread right now. Try again later!"
-        logger.info("[Supervisor] Thread generated.")
-        return thread
+
+    async def generate_newsletter(self) -> str:
+        """Generate a newsletter section from today's top-scored item."""
+        return await self._generate_content_format(
+            "newsletter", lambda item: self.module.get_newsletter_prompt(item), 800
+        )
+
+    async def generate_script(self) -> str:
+        """Generate a TikTok/Reels voiceover script from today's top-scored item."""
+        return await self._generate_content_format(
+            "script", lambda item: self.module.get_script_prompt(item), 600
+        )
 
     async def generate_report_for_topic(self, topic: str) -> str:
         """Full pipeline scoped to items matching a topic keyword."""
@@ -145,13 +170,24 @@ class SupervisorAgent:
         return ctx.report_text or "Could not generate report."
 
 
+async def generate_report_for_module(module_name: str) -> str:
+    """Convenience: load a module by name and run the full report pipeline."""
+    module = load_module(module_name)
+    supervisor = SupervisorAgent(module)
+    return await supervisor.generate_report()
+
+
 def load_module(module_name: str) -> BaseModule:
     from modules.tech.sources import TechModule
     from modules.crypto.sources import CryptoModule
+    from modules.vietnam.sources import VietnamModule
+    from modules.indie.sources import IndieModule
 
     registry: dict[str, type[BaseModule]] = {
-        "tech":   TechModule,
-        "crypto": CryptoModule,
+        "tech":    TechModule,
+        "crypto":  CryptoModule,
+        "vietnam": VietnamModule,
+        "indie":   IndieModule,
     }
     cls = registry.get(module_name)
     if cls is None:

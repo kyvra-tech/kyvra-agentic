@@ -4,7 +4,6 @@ from datetime import datetime
 
 from agents.base import BaseAgent, PipelineContext, ScoredItem
 from modules.base import RawItem
-from modules.tech.config import GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD
 from config import MAX_REPORT_ITEMS
 
 # X authority accounts get a minimum engagement floor.
@@ -81,21 +80,37 @@ def _cross_source_boost(item: RawItem) -> int:
     return 10 if item.cross_source_count >= 2 else 0
 
 
-def _is_spike(item: RawItem) -> bool:
+def _velocity_score(item: RawItem) -> int:
+    """0–10 pts. Rewards X items that are trending fast (high likes in a short window)."""
+    if not item.source.startswith("X -"):
+        return 0
+    ts = _parse_timestamp(item.published_at)
+    if ts is None:
+        return 0
+    age_hours = (time.time() - ts) / 3600
+    if age_hours < 1:
+        return min(10, item.score // 50)
+    if age_hours < 3:
+        return min(7, item.score // 100)
+    return 0
+
+
+def _is_spike(item: RawItem, github_threshold: int, x_threshold: int) -> bool:
     return (
-        (item.source == "GitHub Trending" and item.score >= GITHUB_STARS_SPIKE)
-        or (item.source.startswith("X -") and item.score >= X_SPIKE_THRESHOLD)
+        (item.source == "GitHub Trending" and item.score >= github_threshold)
+        or (item.source.startswith("X -") and item.score >= x_threshold)
     )
 
 
-def score_item(item: RawItem, keywords: list[str]) -> ScoredItem:
+def score_item(item: RawItem, keywords: list[str], github_threshold: int = 100, x_threshold: int = 500) -> ScoredItem:
     engagement   = _engagement_score(item)          # 0–40
     authority    = item.authority_score              # 0–20
     recency      = _recency_score(item.published_at) # 0–20
     relevance    = _relevance_score(item, keywords)  # 10–20  (was fixed at 10)
     cross_boost  = _cross_source_boost(item)         # 0 or 10
+    velocity     = _velocity_score(item)             # 0–10 (X only: fast engagement)
 
-    confidence = min(100, engagement + authority + recency + relevance + cross_boost)
+    confidence = min(100, engagement + authority + recency + relevance + cross_boost + velocity)
 
     return ScoredItem(
         title=item.title,
@@ -104,7 +119,7 @@ def score_item(item: RawItem, keywords: list[str]) -> ScoredItem:
         published_at=item.published_at,
         summary=item.summary,
         confidence_score=confidence,
-        is_spike=_is_spike(item),
+        is_spike=_is_spike(item, github_threshold, x_threshold),
         raw_score=item.score,
         cross_source_count=item.cross_source_count,
     )
@@ -116,9 +131,10 @@ class AnalystAgent(BaseAgent):
     async def run(self, ctx: PipelineContext) -> PipelineContext:
         self._log(f"Scoring {len(ctx.raw_items)} items...")
         keywords = [kw.lower() for kw in ctx.module.get_keywords()]
+        github_threshold, x_threshold = ctx.module.get_spike_thresholds()
 
         scored = sorted(
-            [score_item(item, keywords) for item in ctx.raw_items],
+            [score_item(item, keywords, github_threshold, x_threshold) for item in ctx.raw_items],
             key=lambda x: (x.is_spike, x.confidence_score),
             reverse=True,
         )

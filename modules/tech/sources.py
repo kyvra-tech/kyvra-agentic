@@ -117,6 +117,36 @@ class TechModule(BaseModule):
                 params={"language": "", "since": "daily"},
                 authority_score=SOURCE_AUTHORITY["GitHub Trending"],
             ),
+            # ── Reddit RSS: community discussion signal ────────────────────
+            DataSource(
+                name="Reddit - ML",
+                url="https://www.reddit.com/r/MachineLearning/new/.rss",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reddit - ML", 11),
+            ),
+            DataSource(
+                name="Reddit - LocalLLaMA",
+                url="https://www.reddit.com/r/LocalLLaMA/new/.rss",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reddit - LocalLLaMA", 10),
+            ),
+            DataSource(
+                name="Reddit - SideProject",
+                url="https://www.reddit.com/r/SideProject/new/.rss",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reddit - SideProject", 9),
+            ),
+            # ── TLDR Tech newsletter feed ──────────────────────────────────
+            DataSource(
+                name="TLDR Tech",
+                url="https://tldr.tech/api/rss/tech",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("TLDR Tech", 12),
+            ),
         ]
 
     def get_report_prompt(self, items: list[dict]) -> str:
@@ -127,6 +157,12 @@ class TechModule(BaseModule):
 
     def get_brief_prompt(self, items: list[dict]) -> str:
         return prompts.build_brief_prompt(items)
+
+    def get_newsletter_prompt(self, item: dict) -> str:
+        return prompts.build_newsletter_prompt(item)
+
+    def get_script_prompt(self, item: dict) -> str:
+        return prompts.build_script_prompt(item)
 
     def get_chat_system_prompt(self) -> str:
         return prompts.CHAT_SYSTEM_PROMPT
