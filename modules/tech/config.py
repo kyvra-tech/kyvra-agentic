@@ -30,6 +30,12 @@ SOURCE_AUTHORITY = {
     "X - OSS":              12,
     # GitHub: native signal for dev trends
     "GitHub Trending":      15,
+    # Reddit
+    "Reddit - ML":          11,
+    "Reddit - LocalLLaMA":  10,
+    "Reddit - SideProject":  9,
+    # TLDR Tech newsletter
+    "TLDR Tech":            12,
 }
 
 # GitHub: trending repo is notable if stars_today > this

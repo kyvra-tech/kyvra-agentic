@@ -54,6 +54,24 @@ class BaseModule(ABC):
         ...
 
     @abstractmethod
+    def get_newsletter_prompt(self, item: dict) -> str:
+        """Return the prompt to generate a newsletter section from a single top item."""
+        ...
+
+    @abstractmethod
+    def get_script_prompt(self, item: dict) -> str:
+        """Return the prompt to generate a TikTok/Reels voiceover script from a single top item."""
+        ...
+
+    @abstractmethod
     def get_keywords(self) -> list[str]:
         """Return keywords used for relevance filtering."""
         ...
+
+    def get_spike_thresholds(self) -> tuple[int, int]:
+        """Return (github_stars_spike, x_likes_spike) thresholds for this module.
+
+        Override in subclasses to tune spike sensitivity per niche.
+        Defaults: GitHub 100 stars/day, X 500 likes.
+        """
+        return (100, 500)

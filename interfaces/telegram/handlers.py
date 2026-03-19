@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Runtime module state — starts from .env, changed by /module command without restart
 _active_module: str = ACTIVE_MODULE
-AVAILABLE_MODULES = ["tech", "crypto"]
+AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie"]
 
 # Per-user chat history for /chat command (in-memory, resets on restart)
 _chat_histories: dict[int, list[dict]] = {}
@@ -72,8 +72,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/report – Full AI-written daily report\n"
         "/brief – 3-bullet summary, ready to share\n"
         "/thread – 7-tweet thread from today's top story\n"
+        "/newsletter – Newsletter section from today's top story\n"
+        "/script – TikTok/Reels voiceover script\n"
+        "/status – Source health & item count check\n"
         "/chat [msg] – Chat about today's news\n"
-        "/module [tech|crypto] – Switch focus module\n\n"
+        "/module [tech|crypto|vietnam|indie] – Switch focus module\n\n"
         "Try `/update` for a quick check! ⚡"
     )
     await update.message.reply_text(text)
@@ -89,10 +92,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
         "⚡ */brief* – 3-bullet summary, screenshot-ready\n"
         "🧵 */thread* – 7-tweet X thread from today's top story\n"
+        "📰 */newsletter* – Newsletter section from today's top story\n"
+        "🎬 */script* – TikTok/Reels voiceover script from today's top story\n"
+        "📊 */status* – Source health check: items fetched, top score, spikes\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
-        "🧩 */module [tech|crypto]* – Switch active module\n\n"
-        "📅 Auto-report every day at *8:00 AM* (GMT+7)"
+        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n\n"
+        "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
     )
     await update.message.reply_text(text)
 
@@ -222,7 +228,12 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     history = _chat_histories.get(user_id, [])
     typing_msg = await update.message.reply_text("💭 Thinking...")
 
-    reply = await chat_with_llm(user_message, _get_module().get_chat_system_prompt(), history)
+    try:
+        reply = await chat_with_llm(user_message, _get_module().get_chat_system_prompt(), history)
+    except Exception as e:
+        logger.error(f"Chat LLM call failed for user {user_id}: {e}")
+        await typing_msg.edit_text("❌ Could not get a response. Please try again.")
+        return
 
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": reply})
@@ -230,6 +241,63 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await typing_msg.delete()
     for chunk in split_long_message(reply):
+        await update.message.reply_text(chunk)
+
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/status — quick status check: sources, items fetched, top score, spikes."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=status module={_active_module}")
+    msg = await update.message.reply_text("📊 Running status check... (~10 sec)")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        status = await supervisor.get_status()
+    except Exception as e:
+        logger.error(f"Status check failed: {e}")
+        await msg.edit_text("❌ Status check failed.")
+        return
+    lines = [
+        f"📊 *Kyvra Status* — module: *{status['module']}*",
+        f"Items fetched: {status['total_fetched']}",
+        f"Top score: {status['top_score']}/100",
+        f"Spikes: {status['spikes']}",
+        "",
+        "*Sources:*",
+    ]
+    for source, count in sorted(status['sources'].items()):
+        lines.append(f"  • {source}: {count}")
+    await msg.delete()
+    await update.message.reply_text("\n".join(lines))
+
+
+async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/newsletter — generate a newsletter section from today's top story."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=newsletter module={_active_module}")
+    msg = await update.message.reply_text("📰 Writing newsletter section from today's top story...")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        newsletter = await supervisor.generate_newsletter()
+    except Exception as e:
+        logger.error(f"Newsletter generation failed: {e}")
+        await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
+        return
+    await msg.delete()
+    for chunk in split_long_message(newsletter):
+        await update.message.reply_text(chunk)
+
+
+async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/script — generate a TikTok/Reels voiceover script from today's top story."""
+    logger.info(f"[Analytics] user={update.effective_user.id} command=script module={_active_module}")
+    msg = await update.message.reply_text("🎬 Writing voiceover script from today's top story...")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        script = await supervisor.generate_script()
+    except Exception as e:
+        logger.error(f"Script generation failed: {e}")
+        await msg.edit_text("❌ Could not generate script. Please try again later.")
+        return
+    await msg.delete()
+    for chunk in split_long_message(script):
         await update.message.reply_text(chunk)
 
 

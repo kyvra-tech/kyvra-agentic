@@ -104,6 +104,72 @@ Rules:
 - Include BULLISH/BEARISH/NEUTRAL signal somewhere in the thread"""
 
 
+def build_newsletter_prompt(item: dict) -> str:
+    return f"""You are Kyvra Crypto — AI content agent for crypto markets.
+
+Top signal:
+Title: {item['title']}
+Source: {item['source']} | URL: {item['url']}
+Summary: {item['summary']}
+Confidence: {item['confidence_score']}/100
+
+Write a crypto newsletter section:
+
+## [Title — sharp, CT-style]
+
+[Hook — 1-2 sentences, lead with the number or the surprise]
+
+**What happened:** [2-3 sentences]
+
+**Signal:** [BULLISH / BEARISH / NEUTRAL] — [2-3 sentences: market implication]
+
+**What to watch:** [1-2 sentences: price level, on-chain metric, or narrative to track]
+
+**Content angle:** [CT thread hook or YouTube breakdown idea]
+
+---
+*Source: [{item['source']}]({item['url']})*
+
+Rules: data-aware, CT tone, lead with impact"""
+
+
+def build_script_prompt(item: dict) -> str:
+    return f"""You are Kyvra Crypto — AI content agent for crypto markets.
+
+Top signal:
+Title: {item['title']}
+Source: {item['source']} | URL: {item['url']}
+Summary: {item['summary']}
+Confidence: {item['confidence_score']}/100
+
+Write a TikTok/Reels voiceover script (60–90 seconds when spoken at normal pace).
+
+Format:
+[HOOK — 0-3s]
+[One punchy sentence. Make them stop scrolling.]
+
+[SETUP — 3-15s]
+[What happened. 2-3 sentences max. Fast pace.]
+
+[THE MEAT — 15-50s]
+[Why it matters for crypto. The real insight. Concrete example. 4-6 sentences.]
+
+[SIGNAL — 50-60s]
+BULLISH / BEARISH / NEUTRAL — [One sentence reason.]
+
+[TWIST/SURPRISE — 60-65s]
+[The thing most people miss. One surprising angle. 2 sentences.]
+
+[CTA — 65-75s]
+[Follow for more. Ask a question. One sentence.]
+
+Rules:
+- Write exactly as it would be spoken — short sentences, natural pauses
+- No filler ("So basically...", "What this means is...")
+- Each section label is a direction, not spoken aloud
+- Target 150-180 words total (60-75 sec at ~2.5 words/sec)"""
+
+
 def build_brief_prompt(items: list[dict]) -> str:
     top3 = items[:3]
     items_text = ""

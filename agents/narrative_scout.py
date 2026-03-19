@@ -24,12 +24,36 @@ _CRYPTO_TOPICS: dict[str, list[str]] = {
     "Funding / VC":  ["raises", "funding", "series", "valuation", "vc", "backed"],
 }
 
-_MODULE_TOPICS: dict[str, dict[str, list[str]]] = {
-    "tech":   _TECH_TOPICS,
-    "crypto": _CRYPTO_TOPICS,
+_VIETNAM_TOPICS: dict[str, list[str]] = {
+    "Vietnam Startup": ["vietnam", "viet", "hanoi", "hcmc", "saigon", "vng", "momo", "tiki"],
+    "SEA Tech":        ["southeast asia", "sea", "singapore", "indonesia", "grab", "gojek"],
+    "Vietnam Crypto":  ["coin98", "kyber", "axie", "sky mavis", "vndc", "viction"],
+    "Fintech VN":      ["vnpay", "zalopay", "momo", "fintech", "ngan hang"],
+    "AI / LLM":        ["llm", "ai", "gpt", "claude", "gemini", "vinai"],
+    "Funding":         ["raises", "funding", "series", "dau tu", "goi von"],
 }
-_DEFAULT_FALLBACK = "Tech 📊"
-_CRYPTO_FALLBACK = "Crypto 📊"
+
+_INDIE_TOPICS: dict[str, list[str]] = {
+    "Launches":        ["launch", "launched", "product hunt", "show hn", "shipped"],
+    "MRR / Revenue":   ["mrr", "arr", "revenue", "paying", "customers", "churn"],
+    "AI Tools":        ["ai tool", "ai app", "cursor", "replit", "vibe cod", "llm"],
+    "Built in Public": ["built in public", "building in public", "bip", "open startup"],
+    "Funding":         ["raises", "funding", "backed", "acquired", "valuation"],
+    "Distribution":    ["viral", "hacker news", "reddit", "twitter", "seo", "growth"],
+}
+
+_MODULE_TOPICS: dict[str, dict[str, list[str]]] = {
+    "tech":    _TECH_TOPICS,
+    "crypto":  _CRYPTO_TOPICS,
+    "vietnam": _VIETNAM_TOPICS,
+    "indie":   _INDIE_TOPICS,
+}
+_MODULE_FALLBACKS: dict[str, str] = {
+    "tech":    "Tech 📊",
+    "crypto":  "Crypto 📊",
+    "vietnam": "Vietnam Tech 🇻🇳",
+    "indie":   "Indie 🚀",
+}
 
 _HEAT: dict[int, str] = {5: "🔥", 4: "📈", 3: "🟡", 2: "👀", 1: "📉"}
 
@@ -48,7 +72,7 @@ class NarrativeScoutAgent(BaseAgent):
         self._log(f"Scanning {len(ctx.raw_items)} items for trending topics...")
 
         topics = _MODULE_TOPICS.get(ctx.module.name, _TECH_TOPICS)
-        fallback = _CRYPTO_FALLBACK if ctx.module.name == "crypto" else _DEFAULT_FALLBACK
+        fallback = _MODULE_FALLBACKS.get(ctx.module.name, "Tech 📊")
 
         counts: Counter = Counter()
         for item in ctx.raw_items:
