@@ -168,11 +168,12 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ---
 
-### T-017: Usage analytics logging
+### T-017: Usage analytics logging ✅ DONE
 **What:** Add structured analytics log lines per command handler: `logger.info(f"[Analytics] user={user_id} command=report module={ACTIVE_MODULE}")`.
 **Why:** For B2C product decisions, you need to know which commands users actually use, which topics they search, and how often. Structured logs enable grep-based analysis even without a dashboard.
 **Effort:** S
 **Priority:** P3
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
