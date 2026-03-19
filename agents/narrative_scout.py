@@ -1,7 +1,7 @@
 from collections import Counter
 from agents.base import BaseAgent, PipelineContext
 
-TREND_TOPICS: dict[str, list[str]] = {
+_TECH_TOPICS: dict[str, list[str]] = {
     "AI Agents":         ["agent", "agentic", "autonomous", "tool use", "mcp"],
     "LLM / Models":      ["llm", "model", "gpt", "claude", "gemini", "llama", "mistral", "grok"],
     "OpenAI":            ["openai", "gpt", "chatgpt", "o1", "o3", "o4"],
@@ -12,6 +12,24 @@ TREND_TOPICS: dict[str, list[str]] = {
     "AI Tools":          ["cursor", "copilot", "replit", "vercel", "supabase"],
     "Funding":           ["raises", "funding", "acqui", "series", "valuation"],
 }
+
+_CRYPTO_TOPICS: dict[str, list[str]] = {
+    "Bitcoin":       ["bitcoin", "btc", "satoshi", "lightning", "ordinals"],
+    "Ethereum":      ["ethereum", "eth", "eip", "vitalik", "pectra"],
+    "DeFi":          ["defi", "tvl", "yield", "liquidity", "amm", "dex", "lending"],
+    "Layer 2":       ["l2", "rollup", "optimism", "arbitrum", "zksync", "base", "starknet"],
+    "Regulation":    ["sec", "cftc", "regulation", "compliance", "etf", "legal", "law"],
+    "Stablecoins":   ["usdc", "usdt", "stablecoin", "depeg", "tether", "dai"],
+    "NFT / Gaming":  ["nft", "gaming", "axie", "web3 game", "metaverse"],
+    "Funding / VC":  ["raises", "funding", "series", "valuation", "vc", "backed"],
+}
+
+_MODULE_TOPICS: dict[str, dict[str, list[str]]] = {
+    "tech":   _TECH_TOPICS,
+    "crypto": _CRYPTO_TOPICS,
+}
+_DEFAULT_FALLBACK = "Tech 📊"
+_CRYPTO_FALLBACK = "Crypto 📊"
 
 _HEAT: dict[int, str] = {5: "🔥", 4: "📈", 3: "🟡", 2: "👀", 1: "📉"}
 
@@ -29,17 +47,20 @@ class NarrativeScoutAgent(BaseAgent):
     async def run(self, ctx: PipelineContext) -> PipelineContext:
         self._log(f"Scanning {len(ctx.raw_items)} items for trending topics...")
 
+        topics = _MODULE_TOPICS.get(ctx.module.name, _TECH_TOPICS)
+        fallback = _CRYPTO_FALLBACK if ctx.module.name == "crypto" else _DEFAULT_FALLBACK
+
         counts: Counter = Counter()
         for item in ctx.raw_items:
             text = (item.title + " " + item.summary).lower()
-            for topic, keywords in TREND_TOPICS.items():
+            for topic, keywords in topics.items():
                 if any(kw in text for kw in keywords):
                     counts[topic] += 1
 
         top = counts.most_common(4)
         ctx.trend_heatmap = " | ".join(
             f"{topic} {_heat(n)}" for topic, n in top if n > 0
-        ) or "Tech 📊"
+        ) or fallback
 
         self._log(f"Heatmap: {ctx.trend_heatmap}")
         return ctx
