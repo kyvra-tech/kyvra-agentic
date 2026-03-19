@@ -77,7 +77,7 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 
 ## Phase 2 — B2C foundation (next PR after develop lands)
 
-### T-008: /thread command — the killer demo feature
+### T-008: /thread command — the killer demo feature ✅ DONE
 **What:** New prompt in `modules/tech/prompts.py` + new `/thread` command handler in `interfaces/telegram/handlers.py`. Runs the full pipeline and generates a 7-tweet Twitter thread from the top story.
 **Why:** This is the first thing a creator will screenshot and share. It transforms Kyvra from "news aggregator" to "content co-pilot." The LLM + pipeline is already there — this is a new prompt + handler.
 **Pros:** Viral demo potential. Product story changes from "daily report" to "content creation assistant."
@@ -86,15 +86,17 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 **Effort:** M
 **Priority:** P1
 **Depends on:** T-001 through T-007 (develop PR landed)
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
-### T-009: /brief command — 3-bullet shareable summary
+### T-009: /brief command — 3-bullet shareable summary ✅ DONE
 **What:** New prompt in `modules/tech/prompts.py` + `/brief` handler. Returns 3 bullet points from today's top stories. Fits in a screenshot.
 **Why:** Ultra-short output = maximum shareability. Organic distribution. Also useful as a Slack/group chat format for team use cases.
 **Effort:** S
 **Priority:** P2
 **Depends on:** T-008 (same prompt pattern)
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -109,22 +111,24 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 
 ---
 
-### T-011: Signal strength labels (replace raw confidence score in output)
+### T-011: Signal strength labels (replace raw confidence score in output) ✅ DONE
 **What:** In `interfaces/telegram/formatter.py`, replace `Score: 94/100` with a human-readable signal tier label + reason. Example: `🔥 VIRAL — 4 sources, trending 2h` or `📈 RISING — Anthropic official`.
 **Why:** Creators don't understand what "94/100" means. A label that explains *why* something is hot builds trust and makes the report feel smarter.
 **Context:** The data to compute the label already exists on `ScoredItem`: `confidence_score`, `is_spike`, `cross_source_count`, `authority_score`. Tiers: VIRAL (spike + cross-source), RISING (high score, recent), STEADY (RSS authority), SIGNAL (baseline).
 **Effort:** S
 **Priority:** P2
 **File:** `interfaces/telegram/formatter.py`
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
-### T-012: Daily content angle — add to report prompt
+### T-012: Daily content angle — add to report prompt ✅ DONE
 **What:** Add one instruction to the existing report prompt in `modules/tech/prompts.py` asking for a standalone "Content angle of the day" section at the end.
 **Why:** Transforms Kyvra from news aggregator to content strategist. Zero new infrastructure — the LLM is already generating the report, just ask it for a bonus hook for the top story.
 **Effort:** S
 **Priority:** P2
 **File:** `modules/tech/prompts.py`
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
