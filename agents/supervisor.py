@@ -67,6 +67,34 @@ class SupervisorAgent:
         logger.info("[Supervisor] Pipeline complete.")
         return ctx.report_text or "Could not generate report."
 
+    async def generate_thread(self) -> str:
+        """Generate a Twitter thread from today's top-scored item."""
+        logger.info("[Supervisor] Thread generation started...")
+        ctx = await self._collect_and_score()
+
+        if not ctx.top_items:
+            return "No news today to build a thread from. Try again later!"
+
+        top = ctx.top_items[0]
+        item = {
+            "title": top.title,
+            "url": top.url,
+            "source": top.source,
+            "published_at": top.published_at,
+            "summary": top.summary,
+            "confidence_score": top.confidence_score,
+            "is_spike": top.is_spike,
+        }
+        prompt = ctx.module.get_thread_prompt(item)
+        import services.llm as llm
+        try:
+            thread = await llm.complete(prompt, max_tokens=1200)
+        except Exception as e:
+            logger.error(f"Thread LLM call failed: {e}")
+            return "Could not generate thread right now. Try again later!"
+        logger.info("[Supervisor] Thread generated.")
+        return thread
+
     async def generate_report_for_topic(self, topic: str) -> str:
         """Full pipeline scoped to items matching a topic keyword."""
         logger.info(f"[Supervisor] Topic pipeline: '{topic}'")

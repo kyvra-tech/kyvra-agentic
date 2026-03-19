@@ -70,6 +70,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/breaking – Spike alerts only\n"
         "/topic [kw] – Report scoped to one topic\n"
         "/report – Full AI-written daily report\n"
+        "/thread – 7-tweet thread from today's top story\n"
         "/chat [msg] – Chat about today's news\n"
         "/module [tech|crypto] – Switch focus module\n\n"
         "Try `/update` for a quick check! ⚡"
@@ -85,6 +86,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
         "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
+        "🧵 */thread* – 3-tweet X thread from today's top story\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "🧩 */module [tech|crypto]* – Switch active module\n\n"
@@ -163,6 +165,22 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await msg.delete()
     for chunk in split_long_message(report):
+        await update.message.reply_text(chunk)
+
+
+async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/thread — generate a 7-tweet Twitter thread from today's top story."""
+    msg = await update.message.reply_text("🧵 Writing thread from today's top story... (30-60 sec)")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        thread = await supervisor.generate_thread()
+    except Exception as e:
+        logger.error(f"Thread generation failed: {e}")
+        await msg.edit_text("❌ Could not generate thread. Please try again later.")
+        return
+
+    await msg.delete()
+    for chunk in split_long_message(thread):
         await update.message.reply_text(chunk)
 
 

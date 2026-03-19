@@ -44,6 +44,11 @@ class BaseModule(ABC):
         ...
 
     @abstractmethod
+    def get_thread_prompt(self, item: dict) -> str:
+        """Return the prompt to generate a Twitter thread from a single top item."""
+        ...
+
+    @abstractmethod
     def get_keywords(self) -> list[str]:
         """Return keywords used for relevance filtering."""
         ...

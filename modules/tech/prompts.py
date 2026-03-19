@@ -59,3 +59,39 @@ Rules:
 - Content angles must be specific (hook + format), not generic
 - Write like a smart human, not a press release
 - If Anthropic/OpenAI/Google AI news exists → surface it first"""
+
+
+def build_thread_prompt(item: dict) -> str:
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+
+Here is today's top story:
+
+Title: {item['title']}
+Source: {item['source']}
+URL: {item['url']}
+Summary: {item['summary']}
+Confidence Score: {item['confidence_score']}/100
+Spike: {'YES' if item.get('is_spike') else 'no'}
+
+Write a Twitter/X thread about this story. The thread should be ready to copy-paste and post.
+
+Format:
+1/ [Hook tweet — bold claim or surprising insight, max 280 chars. Make people stop scrolling.]
+
+2/ [Context — what happened, why now. 1-2 sentences max. Include the URL here.]
+
+3/ [The "why it matters" tweet — impact for builders, creators, or the industry.]
+
+4/ [The nuance or contrarian angle — what most people are missing.]
+
+5/ [Implication — what this means for the next 6-12 months.]
+
+6/ [Tactical takeaway — one specific thing the reader can do or watch for.]
+
+7/ [CTA tweet — ask a question or invite a follow. End with a relevant hashtag or two.]
+
+Rules:
+- Each tweet max 280 characters
+- No filler phrases ("In conclusion...", "It's worth noting...")
+- Write like a sharp human, not a press release
+- Hook must be strong enough to make someone screenshot it"""

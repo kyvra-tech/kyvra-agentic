@@ -64,3 +64,39 @@ Rules:
 - If regulatory news exists → surface it prominently
 - If any item is from "X - Vietnam Crypto" → add a 🇻🇳 tag and note the Vietnam angle
 - Keep it sharp: CT audience reads fast"""
+
+
+def build_thread_prompt(item: dict) -> str:
+    return f"""You are Kyvra Crypto — an AI content agent for crypto markets and Web3.
+
+Here is today's top story:
+
+Title: {item['title']}
+Source: {item['source']}
+URL: {item['url']}
+Summary: {item['summary']}
+Confidence Score: {item['confidence_score']}/100
+Spike: {'YES' if item.get('is_spike') else 'no'}
+
+Write a Twitter/X thread about this story for a crypto-native audience. Ready to copy-paste and post.
+
+Format:
+1/ [Hook tweet — bold claim, alpha, or surprising insight, max 280 chars. CT stops scrolling for this.]
+
+2/ [Context — what happened, why now. 1-2 sentences max. Include the URL here.]
+
+3/ [The "why it matters" tweet — price impact, protocol risk, or narrative shift.]
+
+4/ [The on-chain angle or contrarian take — what most people are missing.]
+
+5/ [Implication — what this means for the market or ecosystem in the next weeks/months.]
+
+6/ [Tactical takeaway — one specific thing the reader can do or watch for.]
+
+7/ [CTA tweet — ask a question or signal your take. End with relevant hashtags like #Bitcoin #DeFi #Web3.]
+
+Rules:
+- Each tweet max 280 characters
+- Use CT tone naturally: direct, data-aware, no fluff
+- Hook must be strong enough for a screenshot retweet
+- Include BULLISH/BEARISH/NEUTRAL signal somewhere in the thread"""
