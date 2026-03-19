@@ -2,26 +2,31 @@ from datetime import datetime, timezone, timedelta
 from agents.base import ScoredItem
 
 _VN_TZ = timezone(timedelta(hours=7))
-_SPIKE_LABEL = "🔴 SPIKE"
-_SCORE_EMOJI = {80: "📈", 60: "🟡", 0: "⬜"}
 
 
-def _score_emoji(score: int) -> str:
-    for threshold in sorted(_SCORE_EMOJI, reverse=True):
-        if score >= threshold:
-            return _SCORE_EMOJI[threshold]
-    return "⬜"
+def _signal_label(item: ScoredItem) -> str:
+    """Return a human-readable signal tier label with reason."""
+    if item.is_spike and item.cross_source_count >= 2:
+        return f"🔥 VIRAL — spike, {item.cross_source_count} sources"
+    if item.is_spike:
+        return f"🚨 SPIKE — {item.raw_score:,} engagements"
+    if item.confidence_score >= 80 and item.cross_source_count >= 2:
+        return f"📈 RISING — {item.cross_source_count} sources"
+    if item.confidence_score >= 80:
+        return f"📈 RISING — {item.source}"
+    if item.confidence_score >= 60:
+        return f"🟡 STEADY — {item.source}"
+    return "⬜ SIGNAL"
 
 
 def format_update(items: list[ScoredItem], total_fetched: int) -> str:
     now = datetime.now(_VN_TZ).strftime("%H:%M GMT+7")
     lines = [f"⚡ Quick Update — {now}", f"{total_fetched} items scanned across all sources\n"]
     for item in items[:7]:
-        spike = f" {_SPIKE_LABEL}" if item.is_spike else ""
-        emoji = _score_emoji(item.confidence_score)
+        label = _signal_label(item)
         title = item.title[:80] + ("…" if len(item.title) > 80 else "")
-        lines.append(f"{emoji}{spike} [{item.source}] {title}")
-        lines.append(f"└ Score: {item.confidence_score}/100 | {item.url}\n")
+        lines.append(f"[{item.source}] {title}")
+        lines.append(f"└ {label} | {item.url}\n")
     lines.append("Use /report for full AI-written analysis")
     return "\n".join(lines)
 
@@ -32,9 +37,10 @@ def format_breaking(spikes: list[ScoredItem]) -> str:
         return f"🟢 No breaking spikes right now — {now}"
     lines = [f"🚨 Breaking / Spike Items — {now}\n"]
     for item in spikes:
+        label = _signal_label(item)
         title = item.title[:90] + ("…" if len(item.title) > 90 else "")
-        lines.append(f"🔴 [{item.source}] {title}")
-        lines.append(f"└ Score: {item.confidence_score}/100 | raw: {item.raw_score} | {item.url}\n")
+        lines.append(f"[{item.source}] {title}")
+        lines.append(f"└ {label} | {item.url}\n")
     return "\n".join(lines)
 
 

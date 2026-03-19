@@ -37,10 +37,8 @@ def _get_ollama_client() -> AsyncOpenAI:
     return _ollama_client
 
 
-async def complete(prompt: str, max_tokens: int = 2000) -> str:
-    """Single-turn completion. Falls back to Ollama on xAI 429."""
-    messages = [{"role": "user", "content": prompt}]
-
+async def _call_with_fallback(messages: list[dict], max_tokens: int) -> str:
+    """Call xAI Grok, falling back to Ollama on 429 or if no API key is set."""
     if XAI_API_KEY:
         try:
             response = await _get_xai_client().chat.completions.create(
@@ -61,27 +59,13 @@ async def complete(prompt: str, max_tokens: int = 2000) -> str:
         messages=messages,
     )
     return response.choices[0].message.content or ""
+
+
+async def complete(prompt: str, max_tokens: int = 2000) -> str:
+    """Single-turn completion. Falls back to Ollama on xAI 429."""
+    return await _call_with_fallback([{"role": "user", "content": prompt}], max_tokens)
 
 
 async def chat(messages: list[dict], max_tokens: int = 1000) -> str:
     """Multi-turn chat. Falls back to Ollama on xAI 429."""
-    if XAI_API_KEY:
-        try:
-            response = await _get_xai_client().chat.completions.create(
-                model=GROK_MODEL,
-                max_tokens=max_tokens,
-                messages=messages,
-            )
-            return response.choices[0].message.content or ""
-        except (RateLimitError, APIStatusError) as e:
-            if isinstance(e, APIStatusError) and e.status_code != 429:
-                raise
-            logger.warning("[LLM] xAI rate limit / credits exhausted — falling back to Ollama")
-
-    logger.info(f"[LLM] Using Ollama ({OLLAMA_MODEL}) at {OLLAMA_BASE_URL}")
-    response = await _get_ollama_client().chat.completions.create(
-        model=OLLAMA_MODEL,
-        max_tokens=max_tokens,
-        messages=messages,
-    )
-    return response.choices[0].message.content or ""
+    return await _call_with_fallback(messages, max_tokens)

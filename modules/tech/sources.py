@@ -122,6 +122,12 @@ class TechModule(BaseModule):
     def get_report_prompt(self, items: list[dict]) -> str:
         return prompts.build_report_prompt(items)
 
+    def get_thread_prompt(self, item: dict) -> str:
+        return prompts.build_thread_prompt(item)
+
+    def get_brief_prompt(self, items: list[dict]) -> str:
+        return prompts.build_brief_prompt(items)
+
     def get_chat_system_prompt(self) -> str:
         return prompts.CHAT_SYSTEM_PROMPT
 

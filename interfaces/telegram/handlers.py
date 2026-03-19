@@ -32,23 +32,20 @@ async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not requested:
         options = " | ".join(f"`{m}`" for m in AVAILABLE_MODULES)
         await update.message.reply_text(
-            f"🧩 Active module: *{_active_module}*\n\nAvailable: {options}\n\nUsage: `/module crypto`",
-            parse_mode="Markdown",
+            f"🧩 Active module: {_active_module}\n\nAvailable: {options}\n\nUsage: /module crypto",
         )
         return
 
     if requested not in AVAILABLE_MODULES:
         options = " | ".join(f"`{m}`" for m in AVAILABLE_MODULES)
         await update.message.reply_text(
-            f"❌ Unknown module: `{requested}`\n\nAvailable: {options}",
-            parse_mode="Markdown",
+            f"❌ Unknown module: {requested}\n\nAvailable: {options}",
         )
         return
 
     if requested == _active_module:
         await update.message.reply_text(
-            f"✅ Already on *{_active_module}* module.",
-            parse_mode="Markdown",
+            f"✅ Already on {_active_module} module.",
         )
         return
 
@@ -59,8 +56,7 @@ async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     _chat_histories.clear()
 
     await update.message.reply_text(
-        f"✅ Switched to *{_active_module}* module.\nChat history cleared. Run `/report` for today's briefing.",
-        parse_mode="Markdown",
+        f"✅ Switched to {_active_module} module.\nChat history cleared. Run /report for today's briefing.",
     )
 
 
@@ -74,11 +70,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/breaking – Spike alerts only\n"
         "/topic [kw] – Report scoped to one topic\n"
         "/report – Full AI-written daily report\n"
+        "/brief – 3-bullet summary, ready to share\n"
+        "/thread – 7-tweet thread from today's top story\n"
         "/chat [msg] – Chat about today's news\n"
         "/module [tech|crypto] – Switch focus module\n\n"
         "Try `/update` for a quick check! ⚡"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    await update.message.reply_text(text)
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -89,12 +87,14 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
         "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
+        "⚡ */brief* – 3-bullet summary, screenshot-ready\n"
+        "🧵 */thread* – 7-tweet X thread from today's top story\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "🧩 */module [tech|crypto]* – Switch active module\n\n"
         "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    await update.message.reply_text(text)
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -152,12 +152,11 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     topic = " ".join(context.args)[:200].replace("\n", " ").strip() if context.args else ""
     if not topic:
         await update.message.reply_text(
-            "Usage: `/topic [keyword]`\nExamples:\n`/topic openai`\n`/topic bitcoin`\n`/topic defi`",
-            parse_mode="Markdown",
+            "Usage: /topic [keyword]\nExamples:\n/topic openai\n/topic bitcoin\n/topic defi",
         )
         return
 
-    msg = await update.message.reply_text(f"🔍 Finding news about *{topic}*...", parse_mode="Markdown")
+    msg = await update.message.reply_text(f"🔍 Finding news about {topic}...")
     try:
         supervisor = SupervisorAgent(_get_module())
         report = await supervisor.generate_report_for_topic(topic)
@@ -171,14 +170,45 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(chunk)
 
 
+async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/brief — 3-bullet shareable summary of today's top stories."""
+    msg = await update.message.reply_text("⚡ Writing today's brief...")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        brief = await supervisor.generate_brief()
+    except Exception as e:
+        logger.error(f"Brief generation failed: {e}")
+        await msg.edit_text("❌ Could not generate brief. Please try again later.")
+        return
+
+    await msg.delete()
+    for chunk in split_long_message(brief):
+        await update.message.reply_text(chunk)
+
+
+async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/thread — generate a 7-tweet Twitter thread from today's top story."""
+    msg = await update.message.reply_text("🧵 Writing thread from today's top story... (30-60 sec)")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        thread = await supervisor.generate_thread()
+    except Exception as e:
+        logger.error(f"Thread generation failed: {e}")
+        await msg.edit_text("❌ Could not generate thread. Please try again later.")
+        return
+
+    await msg.delete()
+    for chunk in split_long_message(thread):
+        await update.message.reply_text(chunk)
+
+
 async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     user_message = " ".join(context.args)[:500].replace("\n", " ").strip() if context.args else ""
 
     if not user_message:
         await update.message.reply_text(
-            "What do you want to ask? Example:\n`/chat What's new with OpenAI today?`",
-            parse_mode="Markdown"
+            "What do you want to ask? Example:\n/chat What's new with OpenAI today?",
         )
         return
 
