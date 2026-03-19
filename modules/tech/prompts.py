@@ -52,6 +52,8 @@ Generate a DAILY TECH REPORT in the following format (English, sharp, emoji wher
 
 💡 **TL;DR:** [2-3 sentences: what defined today in tech, and what to watch tomorrow]
 
+🎬 **Content angle of the day:** [Pick the single most interesting story. Write a specific, ready-to-use hook — one sentence — for a Twitter thread, newsletter, or short video. Format: "Hook: [hook text] → Format: [thread/newsletter/video] → Why now: [1 sentence]"]
+
 ---
 
 Rules:

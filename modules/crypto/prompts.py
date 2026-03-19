@@ -55,6 +55,8 @@ Generate a DAILY CRYPTO REPORT in the following format (English, sharp, data-awa
 
 💡 **TL;DR:** [2-3 sentences: what dominated today's crypto narrative, and what to watch tomorrow]
 
+🎬 **Content angle of the day:** [Pick the single most interesting signal. Write a specific, ready-to-use hook for a CT thread or YouTube breakdown. Format: "Hook: [hook text] → Format: [thread/video] → Signal: [BULLISH/BEARISH/NEUTRAL]"]
+
 ---
 
 Rules:
