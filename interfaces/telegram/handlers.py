@@ -70,6 +70,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/breaking – Spike alerts only\n"
         "/topic [kw] – Report scoped to one topic\n"
         "/report – Full AI-written daily report\n"
+        "/brief – 3-bullet summary, ready to share\n"
         "/thread – 7-tweet thread from today's top story\n"
         "/chat [msg] – Chat about today's news\n"
         "/module [tech|crypto] – Switch focus module\n\n"
@@ -86,7 +87,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🔍 */topic [keyword]* – AI report scoped to one topic\n"
         "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
         "📋 */report* – Full daily report with content angles (30-60 sec)\n"
-        "🧵 */thread* – 3-tweet X thread from today's top story\n"
+        "⚡ */brief* – 3-bullet summary, screenshot-ready\n"
+        "🧵 */thread* – 7-tweet X thread from today's top story\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "🧩 */module [tech|crypto]* – Switch active module\n\n"
@@ -165,6 +167,22 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await msg.delete()
     for chunk in split_long_message(report):
+        await update.message.reply_text(chunk)
+
+
+async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/brief — 3-bullet shareable summary of today's top stories."""
+    msg = await update.message.reply_text("⚡ Writing today's brief...")
+    try:
+        supervisor = SupervisorAgent(_get_module())
+        brief = await supervisor.generate_brief()
+    except Exception as e:
+        logger.error(f"Brief generation failed: {e}")
+        await msg.edit_text("❌ Could not generate brief. Please try again later.")
+        return
+
+    await msg.delete()
+    for chunk in split_long_message(brief):
         await update.message.reply_text(chunk)
 
 

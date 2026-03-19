@@ -95,3 +95,32 @@ Rules:
 - No filler phrases ("In conclusion...", "It's worth noting...")
 - Write like a sharp human, not a press release
 - Hook must be strong enough to make someone screenshot it"""
+
+
+def build_brief_prompt(items: list[dict]) -> str:
+    top3 = items[:3]
+    items_text = ""
+    for i, item in enumerate(top3, 1):
+        items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
+
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+
+Here are today's top {len(top3)} stories:
+
+{items_text}
+
+Write a ultra-short shareable brief. Format exactly like this:
+
+⚡ Today in Tech:
+
+• [Story 1 — one punchy sentence. What happened + why it matters.]
+• [Story 2 — one punchy sentence. What happened + why it matters.]
+• [Story 3 — one punchy sentence. What happened + why it matters.]
+
+💡 Watch: [One trend or theme connecting these stories, in 1 sentence.]
+
+Rules:
+- Each bullet max 120 characters
+- No filler, no hedging, no "reportedly"
+- Write like a smart Slack message, not a press release
+- The "Watch" line should be a forward-looking signal, not a summary"""

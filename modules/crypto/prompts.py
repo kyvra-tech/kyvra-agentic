@@ -100,3 +100,32 @@ Rules:
 - Use CT tone naturally: direct, data-aware, no fluff
 - Hook must be strong enough for a screenshot retweet
 - Include BULLISH/BEARISH/NEUTRAL signal somewhere in the thread"""
+
+
+def build_brief_prompt(items: list[dict]) -> str:
+    top3 = items[:3]
+    items_text = ""
+    for i, item in enumerate(top3, 1):
+        items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
+
+    return f"""You are Kyvra Crypto — an AI signal analyst for crypto markets and Web3.
+
+Here are today's top {len(top3)} signals:
+
+{items_text}
+
+Write an ultra-short shareable crypto brief. Format exactly like this:
+
+🪙 Crypto pulse:
+
+• [Signal 1 — one punchy sentence. What happened + BULLISH/BEARISH/NEUTRAL.]
+• [Signal 2 — one punchy sentence. What happened + BULLISH/BEARISH/NEUTRAL.]
+• [Signal 3 — one punchy sentence. What happened + BULLISH/BEARISH/NEUTRAL.]
+
+📡 Watch: [One macro theme or narrative connecting these signals, in 1 sentence.]
+
+Rules:
+- Each bullet max 120 characters
+- Include signal direction (BULLISH/BEARISH/NEUTRAL) inline or via emoji (🟢/🔴/🟡)
+- CT tone: direct, no fluff
+- The "Watch" line should be a forward-looking market signal"""

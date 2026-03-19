@@ -67,6 +67,36 @@ class SupervisorAgent:
         logger.info("[Supervisor] Pipeline complete.")
         return ctx.report_text or "Could not generate report."
 
+    async def generate_brief(self) -> str:
+        """Generate a 3-bullet shareable brief from today's top 3 items."""
+        logger.info("[Supervisor] Brief generation started...")
+        ctx = await self._collect_and_score()
+
+        if not ctx.top_items:
+            return "No news today to build a brief from. Try again later!"
+
+        items = [
+            {
+                "title": item.title,
+                "url": item.url,
+                "source": item.source,
+                "published_at": item.published_at,
+                "summary": item.summary,
+                "confidence_score": item.confidence_score,
+                "is_spike": item.is_spike,
+            }
+            for item in ctx.top_items[:3]
+        ]
+        prompt = ctx.module.get_brief_prompt(items)
+        import services.llm as llm
+        try:
+            brief = await llm.complete(prompt, max_tokens=400)
+        except Exception as e:
+            logger.error(f"Brief LLM call failed: {e}")
+            return "Could not generate brief right now. Try again later!"
+        logger.info("[Supervisor] Brief generated.")
+        return brief
+
     async def generate_thread(self) -> str:
         """Generate a Twitter thread from today's top-scored item."""
         logger.info("[Supervisor] Thread generation started...")
