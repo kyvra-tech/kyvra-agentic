@@ -139,13 +139,14 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ---
 
-### T-014: Module-aware /chat system prompt
+### T-014: Module-aware /chat system prompt ✅ DONE
 **What:** Pass the active module's system prompt to `chat_with_llm()` from the module itself, not hardcoded to `modules/tech/prompts.CHAT_SYSTEM_PROMPT`.
 **Why:** When crypto/vietnam modules are active, the `/chat` command still uses the tech niche system prompt. The coupling in `handlers.py:cmd_chat()` hardcodes the import from `modules.tech.prompts`.
 **Context:** `handlers.py` line imports `from modules.tech.prompts import CHAT_SYSTEM_PROMPT`. Should become `ctx.module.get_chat_system_prompt()` — add this method to `BaseModule`.
 **Effort:** S
 **Priority:** P2
 **Depends on:** New modules (Phase 3)
+**Completed:** Already implemented — `handlers.py` calls `_get_module().get_chat_system_prompt()`
 
 ---
 
@@ -186,12 +187,13 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ---
 
-### T-019: Test suite — scoring and dedup unit tests
+### T-019: Test suite — scoring and dedup unit tests ✅ DONE
 **What:** Create `tests/test_analyst.py` and `tests/test_data_collector.py` with unit tests for `score_item()`, `_relevance_score()`, `_engagement_score()` authority floor, and `_dedup_with_cross_source()`.
 **Why:** The confidence scoring algorithm is the core business logic. A silent regression (e.g., cross-source boost stops working) would produce worse reports with no visible error.
 **Context:** All these functions are pure Python with no I/O — no mocking needed. Start with `pytest` + simple `RawItem` fixtures.
 **Effort:** M
 **Priority:** P2
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19) — 45 tests, all passing
 
 ---
 
@@ -212,9 +214,10 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 
 ---
 
-### T-022: NarrativeScoutAgent crypto topics
+### T-022: NarrativeScoutAgent crypto topics ✅ DONE
 **What:** Add a `CRYPTO_TREND_TOPICS` dict to `agents/narrative_scout.py` (or make topics module-aware via `ctx.module`). Current topics (AI Agents, LLM, OpenAI...) are meaningless for the crypto module.
 **Why:** The trend heatmap in crypto reports currently shows tech topics. Crypto needs: Bitcoin, DeFi, Layer 2, Regulation, Stablecoins.
 **Effort:** S
 **Priority:** P2
 **File:** `agents/narrative_scout.py` — pass `ctx.module.name` to select topic set
+**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
