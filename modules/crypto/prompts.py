@@ -69,8 +69,9 @@ Rules:
 - Keep it sharp: CT audience reads fast"""
 
 
-def build_thread_prompt(item: dict) -> str:
-    return f"""You are Kyvra Crypto — an AI content agent for crypto markets and Web3.
+def build_thread_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Crypto — an AI content agent for crypto markets and Web3.{voice_block}
 
 Here is today's top story:
 
@@ -105,8 +106,9 @@ Rules:
 - Include BULLISH/BEARISH/NEUTRAL signal somewhere in the thread"""
 
 
-def build_newsletter_prompt(item: dict) -> str:
-    return f"""You are Kyvra Crypto — AI content agent for crypto markets.
+def build_newsletter_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Crypto — AI content agent for crypto markets.{voice_block}
 
 Top signal:
 Title: {item['title']}
@@ -134,8 +136,9 @@ Write a crypto newsletter section:
 Rules: data-aware, CT tone, lead with impact"""
 
 
-def build_script_prompt(item: dict) -> str:
-    return f"""You are Kyvra Crypto — AI content agent for crypto markets.
+def build_script_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Crypto — AI content agent for crypto markets.{voice_block}
 
 Top signal:
 Title: {item['title']}
@@ -171,13 +174,14 @@ Rules:
 - Target 150-180 words total (60-75 sec at ~2.5 words/sec)"""
 
 
-def build_brief_prompt(items: list[dict]) -> str:
+def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
     top3 = items[:3]
     items_text = ""
     for i, item in enumerate(top3, 1):
         items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
 
-    return f"""You are Kyvra Crypto — an AI signal analyst for crypto markets and Web3.
+    return f"""You are Kyvra Crypto — an AI signal analyst for crypto markets and Web3.{voice_block}
 
 Here are today's top {len(top3)} signals:
 

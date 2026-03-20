@@ -64,8 +64,9 @@ Rules:
 - If Anthropic/OpenAI/Google AI news exists → surface it first"""
 
 
-def build_thread_prompt(item: dict) -> str:
-    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+def build_thread_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.{voice_block}
 
 Here is today's top story:
 
@@ -100,8 +101,9 @@ Rules:
 - Hook must be strong enough to make someone screenshot it"""
 
 
-def build_newsletter_prompt(item: dict) -> str:
-    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+def build_newsletter_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.{voice_block}
 
 Top story:
 Title: {item['title']}
@@ -132,8 +134,9 @@ Rules:
 - "What to watch" must be forward-looking, not a summary"""
 
 
-def build_script_prompt(item: dict) -> str:
-    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+def build_script_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.{voice_block}
 
 Top story:
 Title: {item['title']}
@@ -166,13 +169,14 @@ Rules:
 - Target 150-180 words total (60-75 sec at ~2.5 words/sec)"""
 
 
-def build_brief_prompt(items: list[dict]) -> str:
+def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
     top3 = items[:3]
     items_text = ""
     for i, item in enumerate(top3, 1):
         items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
 
-    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.
+    return f"""You are Kyvra — an AI content agent for Tech, AI, and Indie Dev.{voice_block}
 
 Here are today's top {len(top3)} stories:
 
