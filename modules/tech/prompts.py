@@ -45,6 +45,7 @@ Generate a DAILY TECH REPORT in the following format (English, sharp, emoji wher
 [For each item, write in this format:]
 **N. [relevant emoji] [Short event title]** | Confidence: XX/100
 📌 [1-2 sentences: WHY it matters for builders and creators]
+🔗 Source: [URL from the item]
 🎯 Content angle: "[Specific suggestion: hook, format, platform]"
 
 ---
