@@ -245,9 +245,15 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/status — quick status check: sources, items fetched, top score, spikes."""
+    """/status — source health & last run summary (cached within 2h, else live scan)."""
     logger.info(f"[Analytics] user={update.effective_user.id} command=status module={_active_module}")
-    msg = await update.message.reply_text("📊 Running status check... (~10 sec)")
+    from agents.supervisor import _STATUS_CACHE
+    import time as _time
+    cached = _STATUS_CACHE.get(_active_module)
+    if cached:
+        msg = await update.message.reply_text("📊 Loading status from last run...")
+    else:
+        msg = await update.message.reply_text("📊 Running status check... (~10 sec)")
     try:
         supervisor = SupervisorAgent(_get_module())
         status = await supervisor.get_status()
@@ -255,8 +261,13 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         logger.error(f"Status check failed: {e}")
         await msg.edit_text("❌ Status check failed.")
         return
+
+    cache_entry = _STATUS_CACHE.get(_active_module)
+    age_min = int((_time.time() - cache_entry["timestamp"]) / 60) if cache_entry else 0
+    freshness = f"cached {age_min}m ago" if (cache_entry and age_min > 0) else "live"
+
     lines = [
-        f"📊 *Kyvra Status* — module: *{status['module']}*",
+        f"📊 *Kyvra Status* — module: *{status['module']}* ({freshness})",
         f"Items fetched: {status['total_fetched']}",
         f"Top score: {status['top_score']}/100",
         f"Spikes: {status['spikes']}",

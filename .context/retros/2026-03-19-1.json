@@ -1,0 +1,42 @@
+{
+  "date": "2026-03-19",
+  "window": "7d",
+  "metrics": {
+    "commits": 31,
+    "contributors": 1,
+    "prs_merged": 11,
+    "insertions": 4455,
+    "deletions": 935,
+    "net_loc": 3520,
+    "test_loc": 363,
+    "test_ratio": 0.08,
+    "active_days": 5,
+    "sessions": 6,
+    "deep_sessions": 3,
+    "avg_session_minutes": 55,
+    "loc_per_session_hour": 850,
+    "feat_pct": 0.45,
+    "fix_pct": 0.32,
+    "peak_hour": 17,
+    "ai_assisted_commits": 29
+  },
+  "authors": {
+    "Henry Nguyen": {
+      "commits": 31,
+      "insertions": 4455,
+      "deletions": 935,
+      "test_ratio": 0.08,
+      "top_area": "modules/"
+    }
+  },
+  "version_range": [],
+  "streak_days": 5,
+  "tweetable": "Week of Mar 16: 31 commits (solo), 4.5k LOC, 8% tests, 11 PRs, peak: 5-6pm | Streak: 5d",
+  "backlog": {
+    "total_open": 8,
+    "p0_p1": 2,
+    "p2": 5,
+    "completed_this_period": 14,
+    "added_this_period": 4
+  }
+}

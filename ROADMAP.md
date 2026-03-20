@@ -10,15 +10,15 @@
 
 ---
 
-## Phase 1 — Signal Quality `[next]`
+## Phase 1 — Signal Quality `[done]`
 **Goal:** make the Analyst smarter without LLM cost.
 
-| Task | Why |
-|---|---|
-| Velocity signal: `likes_per_hour` for X | A 2h-old tweet with 300 likes outranks a 6h-old tweet with 500 — raw count misses momentum |
-| Story continuity: detect if a story appeared yesterday | Recurring coverage = growing trend, not a one-day spike |
-| Source health check on startup | Log which sources returned 0 items so silent failures are visible |
-| `/status` command | Shows last run time, items fetched per source, top confidence score |
+| Task | Why | Status |
+|---|---|---|
+| Velocity signal: `likes_per_hour` for X | A 2h-old tweet with 300 likes outranks a 6h-old tweet with 500 — raw count misses momentum | ✅ `_velocity_score()` uses likes/hr tiers |
+| Story continuity: detect if a story appeared yesterday | Recurring coverage = growing trend, not a one-day spike | ✅ `seen_items` SQLite table, filter in DataCollector, spike override, floor bypass |
+| Source health check on startup | Log which sources returned 0 items so silent failures are visible | ✅ DataCollector logs per-source breakdown + errors |
+| `/status` command | Shows last run time, items fetched per source, top confidence score | ✅ Cached (2h TTL), shows freshness label |
 
 ---
 

@@ -1,7 +1,7 @@
 # TODOS — Kyvra Agentic
 
 Deferred work from engineering reviews. Items are ordered by priority within each phase.
-Last updated: 2026-03-17 (X expansion + crypto module shipped)
+Last updated: 2026-03-20 (Phase 1 signal quality shipped)
 
 ---
 
@@ -246,6 +246,18 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 **Context:** Currently `REPORT_CHAT_IDS` is a comma-separated list of ints. Extend to optional `id:module` format, fall back to sending all modules if no module specified.
 **Effort:** S
 **Priority:** P3
+
+---
+
+### T-026: Story continuity spike-override threshold tuning
+**What:** After 1 week of real data, review the spike-override threshold used in the seen-item filter: `likes_per_hour >= x_spike_threshold / 24`. Check logs for "Story continuity floor" warnings (bypass activates too often = threshold too high) and for old stories resurfacing unexpectedly (threshold too low).
+**Why:** The initial value (`x_spike_threshold / 24`, e.g. ~21 likes/hr for tech) is a reasonable first estimate but has not been validated against real CT data. Too tight = floor bypasses daily, negating the feature. Too loose = trending stories get suppressed even when genuinely re-viral.
+**Pros:** Keeps story continuity useful. Prevents "report of already-seen stories" UX problem.
+**Cons:** Requires 7 days of real production data to tune.
+**Context:** Filter lives in `agents/data_collector.py`. Log line to watch: `[DataCollectorAgent] Story continuity floor: only N items after seen filter`. Target: floor activates < 1x/week in normal conditions.
+**Effort:** S
+**Priority:** P2
+**Depends on:** 7 days of production data after Phase 1 ships
 
 ---
 

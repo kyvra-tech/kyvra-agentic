@@ -81,17 +81,24 @@ def _cross_source_boost(item: RawItem) -> int:
 
 
 def _velocity_score(item: RawItem) -> int:
-    """0–10 pts. Rewards X items that are trending fast (high likes in a short window)."""
+    """0–10 pts. Rewards X items with high likes/hour (momentum, not just raw count).
+
+    A 2h-old tweet with 300 likes (150/hr) outranks a 6h-old tweet with 500 likes (83/hr).
+    Tiers: >300/hr → 10pts, >100/hr → 7pts, >50/hr → 4pts, else 0.
+    """
     if not item.source.startswith("X -"):
         return 0
     ts = _parse_timestamp(item.published_at)
     if ts is None:
         return 0
-    age_hours = (time.time() - ts) / 3600
-    if age_hours < 1:
-        return min(10, item.score // 50)
-    if age_hours < 3:
-        return min(7, item.score // 100)
+    age_hours = max((time.time() - ts) / 3600, 0.5)  # floor at 0.5h to avoid div/0
+    likes_per_hour = item.score / age_hours
+    if likes_per_hour >= 300:
+        return 10
+    if likes_per_hour >= 100:
+        return 7
+    if likes_per_hour >= 50:
+        return 4
     return 0
 
 

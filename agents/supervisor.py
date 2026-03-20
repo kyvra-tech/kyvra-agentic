@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import logging
+import time
 from collections import Counter
 from agents.base import PipelineContext
 from agents.data_collector import DataCollectorAgent
@@ -8,8 +9,14 @@ from agents.analyst import AnalystAgent
 from agents.narrative_scout import NarrativeScoutAgent
 from agents.content_writer import ContentWriterAgent
 from modules.base import BaseModule
+import services.memory as memory
 
 logger = logging.getLogger(__name__)
+
+# In-memory cache of the last pipeline result per module.
+# Keyed by module name → {timestamp: float, status: dict}
+_STATUS_CACHE: dict[str, dict] = {}
+_STATUS_CACHE_TTL = 7200  # 2 hours
 
 
 class SupervisorAgent:
@@ -59,6 +66,14 @@ class SupervisorAgent:
             return "No news today. Try again later!"
 
         ctx = await self.writer.run(ctx)
+
+        # Mark delivered items as seen (story continuity) and refresh status cache.
+        if ctx.top_items:
+            memory.mark_seen([i.url for i in ctx.top_items], self.module.name)
+            _STATUS_CACHE[self.module.name] = {
+                "timestamp": time.time(),
+                "status": self._build_status_dict(ctx),
+            }
 
         if ctx.errors:
             logger.warning(f"[Supervisor] {len(ctx.errors)} error(s): {ctx.errors}")
@@ -127,9 +142,7 @@ class SupervisorAgent:
             "thread", lambda item: self.module.get_thread_prompt(item), 1200
         )
 
-    async def get_status(self) -> dict:
-        """Collect + score and return a status summary dict."""
-        ctx = await self._collect_and_score()
+    def _build_status_dict(self, ctx: PipelineContext) -> dict:
         return {
             "module": ctx.module.name,
             "total_fetched": len(ctx.raw_items),
@@ -137,6 +150,18 @@ class SupervisorAgent:
             "spikes": sum(1 for i in ctx.scored_items if i.is_spike),
             "sources": Counter(item.source for item in ctx.raw_items),
         }
+
+    async def get_status(self) -> dict:
+        """Return status dict, using the cached result from the last pipeline run if fresh."""
+        cached = _STATUS_CACHE.get(self.module.name)
+        if cached and (time.time() - cached["timestamp"]) < _STATUS_CACHE_TTL:
+            logger.info("[Supervisor] Returning cached status for module '%s'", self.module.name)
+            return cached["status"]
+        # Cache miss or stale — run a live scan
+        ctx = await self._collect_and_score()
+        status = self._build_status_dict(ctx)
+        _STATUS_CACHE[self.module.name] = {"timestamp": time.time(), "status": status}
+        return status
 
     async def generate_newsletter(self) -> str:
         """Generate a newsletter section from today's top-scored item."""
