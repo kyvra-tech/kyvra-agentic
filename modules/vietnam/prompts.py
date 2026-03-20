@@ -62,8 +62,9 @@ Rules:
 - Write in English (user can request Vietnamese with /chat)"""
 
 
-def build_thread_prompt(item: dict) -> str:
-    return f"""You are Kyvra Vietnam — an AI content agent for Vietnam's tech and startup scene.
+def build_thread_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Vietnam — an AI content agent for Vietnam's tech and startup scene.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}
@@ -83,13 +84,14 @@ Format:
 Rules: max 280 chars per tweet, sharp and locally aware"""
 
 
-def build_brief_prompt(items: list[dict]) -> str:
+def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
     top3 = items[:3]
     items_text = ""
     for i, item in enumerate(top3, 1):
         items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
 
-    return f"""You are Kyvra Vietnam — AI agent for Vietnam tech.
+    return f"""You are Kyvra Vietnam — AI agent for Vietnam tech.{voice_block}
 
 Top {len(top3)} stories:
 {items_text}
@@ -107,8 +109,9 @@ Write an ultra-short shareable brief:
 Rules: each bullet max 120 chars, no filler"""
 
 
-def build_newsletter_prompt(item: dict) -> str:
-    return f"""You are Kyvra Vietnam — AI content agent for Vietnam tech.
+def build_newsletter_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Vietnam — AI content agent for Vietnam tech.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}
@@ -132,8 +135,9 @@ Write a newsletter section for Vietnamese founders and tech builders:
 *Source: [{item['source']}]({item['url']})*"""
 
 
-def build_script_prompt(item: dict) -> str:
-    return f"""You are Kyvra Vietnam — AI content agent for Vietnam's tech and startup scene.
+def build_script_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Vietnam — AI content agent for Vietnam's tech and startup scene.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}

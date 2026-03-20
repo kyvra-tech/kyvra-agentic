@@ -1,8 +1,13 @@
 import asyncio
+import time
 from collections import Counter, defaultdict
 from agents.base import BaseAgent, PipelineContext
 from modules.base import RawItem
 from utils.api_client import fetch_source
+import services.memory as memory
+from agents.analyst import _parse_timestamp
+
+_MIN_ITEMS_AFTER_SEEN_FILTER = 3  # floor: bypass filter if fewer items survive
 
 
 def _dedup_with_cross_source(items: list[RawItem]) -> list[RawItem]:
@@ -69,6 +74,31 @@ class DataCollectorAgent(BaseAgent):
 
         # Dedup and detect cross-source coverage
         deduped = _dedup_with_cross_source(filtered)
+
+        # Story continuity: suppress items already reported in the last 7 days,
+        # unless they are spiking hard (high likes/hour = genuinely trending again).
+        _, x_spike_threshold = ctx.module.get_spike_thresholds()
+        spike_lph = x_spike_threshold / 24  # daily spike threshold → per-hour rate
+        seen_urls = memory.get_seen_urls(ctx.module.name, days=7)
+        if seen_urls:
+            fresh: list[RawItem] = []
+            for item in deduped:
+                if item.url.lower().rstrip("/") not in seen_urls:
+                    fresh.append(item)
+                elif item.source.startswith("X -"):
+                    # Spike override: re-surface if trending hard right now
+                    ts = _parse_timestamp(item.published_at)
+                    age_hours = max((time.time() - ts) / 3600, 0.5) if ts else 24.0
+                    if (item.score / age_hours) >= spike_lph:
+                        fresh.append(item)
+            if len(fresh) >= _MIN_ITEMS_AFTER_SEEN_FILTER:
+                deduped = fresh
+                self._log(f"Story continuity: {len(deduped)} fresh items (suppressed {len(seen_urls)} seen)")
+            else:
+                self._warn(
+                    f"Story continuity floor: only {len(fresh)} items after seen filter — "
+                    f"bypassing to keep all {len(deduped)} items"
+                )
 
         # Log source breakdown for observability
         breakdown = Counter(item.source for item in deduped)

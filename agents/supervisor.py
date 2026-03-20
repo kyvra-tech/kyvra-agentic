@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import logging
+import time
 from collections import Counter
 from agents.base import PipelineContext
 from agents.data_collector import DataCollectorAgent
@@ -8,8 +9,14 @@ from agents.analyst import AnalystAgent
 from agents.narrative_scout import NarrativeScoutAgent
 from agents.content_writer import ContentWriterAgent
 from modules.base import BaseModule
+import services.memory as memory
 
 logger = logging.getLogger(__name__)
+
+# In-memory cache of the last pipeline result per module.
+# Keyed by module name → {timestamp: float, status: dict}
+_STATUS_CACHE: dict[str, dict] = {}
+_STATUS_CACHE_TTL = 7200  # 2 hours
 
 
 class SupervisorAgent:
@@ -60,6 +67,14 @@ class SupervisorAgent:
 
         ctx = await self.writer.run(ctx)
 
+        # Mark delivered items as seen (story continuity) and refresh status cache.
+        if ctx.top_items:
+            memory.mark_seen([i.url for i in ctx.top_items], self.module.name)
+            _STATUS_CACHE[self.module.name] = {
+                "timestamp": time.time(),
+                "status": self._build_status_dict(ctx),
+            }
+
         if ctx.errors:
             logger.warning(f"[Supervisor] {len(ctx.errors)} error(s): {ctx.errors}")
             footer = f"\n\n⚠️ _{len(ctx.errors)} source(s) had issues and were skipped._"
@@ -86,13 +101,15 @@ class SupervisorAgent:
         get_prompt,
         max_tokens: int,
         use_top3: bool = False,
+        user_id: int | None = None,
     ) -> str:
         """Shared pipeline for single-item (or top-3) content format generation.
 
         format_name  — label for log lines (e.g. "brief", "thread")
-        get_prompt   — callable: (item_or_items) -> str
+        get_prompt   — callable: (item_or_items, voice) -> str
         max_tokens   — passed to LLM
         use_top3     — True for brief (top-3 items), False for thread/newsletter/script (top-1)
+        user_id      — Telegram user ID; used to load voice profile from memory
         """
         import services.llm as llm
         logger.info("[Supervisor] %s generation started...", format_name.capitalize())
@@ -101,12 +118,14 @@ class SupervisorAgent:
         if not ctx.top_items:
             return f"No news today to build a {format_name} from. Try again later!"
 
+        voice = memory.get_voice_profile(user_id) if user_id is not None else None
+
         if use_top3:
             payload = [self._item_dict(i) for i in ctx.top_items[:3]]
         else:
             payload = self._item_dict(ctx.top_items[0])
 
-        prompt = get_prompt(payload)
+        prompt = get_prompt(payload, voice)
         try:
             result = await llm.complete(prompt, max_tokens=max_tokens)
         except Exception as e:
@@ -115,21 +134,26 @@ class SupervisorAgent:
         logger.info("[Supervisor] %s generated.", format_name.capitalize())
         return result
 
-    async def generate_brief(self) -> str:
+    async def generate_brief(self, user_id: int | None = None) -> str:
         """Generate a 3-bullet shareable brief from today's top 3 items."""
         return await self._generate_content_format(
-            "brief", lambda items: self.module.get_brief_prompt(items), 400, use_top3=True
+            "brief",
+            lambda items, voice: self.module.get_brief_prompt(items, voice=voice),
+            400,
+            use_top3=True,
+            user_id=user_id,
         )
 
-    async def generate_thread(self) -> str:
+    async def generate_thread(self, user_id: int | None = None) -> str:
         """Generate a Twitter thread from today's top-scored item."""
         return await self._generate_content_format(
-            "thread", lambda item: self.module.get_thread_prompt(item), 1200
+            "thread",
+            lambda item, voice: self.module.get_thread_prompt(item, voice=voice),
+            1200,
+            user_id=user_id,
         )
 
-    async def get_status(self) -> dict:
-        """Collect + score and return a status summary dict."""
-        ctx = await self._collect_and_score()
+    def _build_status_dict(self, ctx: PipelineContext) -> dict:
         return {
             "module": ctx.module.name,
             "total_fetched": len(ctx.raw_items),
@@ -138,16 +162,34 @@ class SupervisorAgent:
             "sources": Counter(item.source for item in ctx.raw_items),
         }
 
-    async def generate_newsletter(self) -> str:
+    async def get_status(self) -> dict:
+        """Return status dict, using the cached result from the last pipeline run if fresh."""
+        cached = _STATUS_CACHE.get(self.module.name)
+        if cached and (time.time() - cached["timestamp"]) < _STATUS_CACHE_TTL:
+            logger.info("[Supervisor] Returning cached status for module '%s'", self.module.name)
+            return cached["status"]
+        # Cache miss or stale — run a live scan
+        ctx = await self._collect_and_score()
+        status = self._build_status_dict(ctx)
+        _STATUS_CACHE[self.module.name] = {"timestamp": time.time(), "status": status}
+        return status
+
+    async def generate_newsletter(self, user_id: int | None = None) -> str:
         """Generate a newsletter section from today's top-scored item."""
         return await self._generate_content_format(
-            "newsletter", lambda item: self.module.get_newsletter_prompt(item), 800
+            "newsletter",
+            lambda item, voice: self.module.get_newsletter_prompt(item, voice=voice),
+            800,
+            user_id=user_id,
         )
 
-    async def generate_script(self) -> str:
+    async def generate_script(self, user_id: int | None = None) -> str:
         """Generate a TikTok/Reels voiceover script from today's top-scored item."""
         return await self._generate_content_format(
-            "script", lambda item: self.module.get_script_prompt(item), 600
+            "script",
+            lambda item, voice: self.module.get_script_prompt(item, voice=voice),
+            600,
+            user_id=user_id,
         )
 
     async def generate_report_for_topic(self, topic: str) -> str:

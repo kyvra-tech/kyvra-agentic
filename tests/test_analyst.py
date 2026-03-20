@@ -12,6 +12,7 @@ from agents.analyst import (
     _cross_source_boost,
     _is_spike,
     _recency_score,
+    _velocity_score,
     score_item,
 )
 from modules.tech.config import X_SPIKE_THRESHOLD, GITHUB_STARS_SPIKE
@@ -140,23 +141,23 @@ class TestCrossSourceBoost:
 class TestIsSpike:
     def test_x_spike_above_threshold(self):
         item = make_item(source="X - AI Leaders", score=X_SPIKE_THRESHOLD)
-        assert _is_spike(item) is True
+        assert _is_spike(item, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD) is True
 
     def test_x_no_spike_below_threshold(self):
         item = make_item(source="X - AI Leaders", score=X_SPIKE_THRESHOLD - 1)
-        assert _is_spike(item) is False
+        assert _is_spike(item, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD) is False
 
     def test_github_spike_above_threshold(self):
         item = make_item(source="GitHub Trending", score=GITHUB_STARS_SPIKE)
-        assert _is_spike(item) is True
+        assert _is_spike(item, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD) is True
 
     def test_github_no_spike_below_threshold(self):
         item = make_item(source="GitHub Trending", score=GITHUB_STARS_SPIKE - 1)
-        assert _is_spike(item) is False
+        assert _is_spike(item, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD) is False
 
     def test_rss_never_spikes(self):
         item = make_item(source="TechCrunch RSS", score=999999)
-        assert _is_spike(item) is False
+        assert _is_spike(item, GITHUB_STARS_SPIKE, X_SPIKE_THRESHOLD) is False
 
 
 # ── _recency_score ────────────────────────────────────────────────────────────
@@ -237,3 +238,60 @@ class TestScoreItem:
         assert result.source == item.source
         assert result.raw_score == 50
         assert result.cross_source_count == 2
+
+
+# ── _velocity_score (likes/hour normalization) ────────────────────────────────
+
+class TestVelocityScore:
+    """velocity_score uses likes/hour, not time brackets.
+    Tiers: >=300/hr → 10, >=100/hr → 7, >=50/hr → 4, else 0.
+    """
+
+    def _x_item(self, score: int, age_hours: float) -> RawItem:
+        """Make an X item with a synthetic timestamp `age_hours` ago."""
+        ts = int(time.time() - age_hours * 3600)
+        return make_item(source="X - AI Trending", score=score, published_at=str(ts))
+
+    def test_non_x_source_returns_zero(self):
+        item = make_item(source="GitHub Trending", score=9999, published_at=str(int(time.time())))
+        assert _velocity_score(item) == 0
+
+    def test_no_timestamp_returns_zero(self):
+        item = make_item(source="X - AI Trending", score=9999, published_at="")
+        assert _velocity_score(item) == 0
+
+    def test_tier_high_300_lph(self):
+        # 1200 likes in 2 hours ≈ 600/hr (well above 300 threshold) → 10pts
+        item = self._x_item(score=1200, age_hours=2.0)
+        assert _velocity_score(item) == 10
+
+    def test_tier_mid_100_lph(self):
+        # 500 likes in 2 hours ≈ 250/hr (above 100, below 300 threshold) → 7pts
+        item = self._x_item(score=500, age_hours=2.0)
+        assert _velocity_score(item) == 7
+
+    def test_tier_low_50_lph(self):
+        # 200 likes in 2 hours ≈ 100/hr edge → use 300 likes in 2h ≈ 150/hr, still 7pts
+        # Use unambiguous value: 200 likes / 2h ≈ 100/hr → should be 7pts (>= 100)
+        # Actually test the 50-99/hr range: 150 likes / 2h = 75/hr → 4pts
+        item = self._x_item(score=150, age_hours=2.0)
+        assert _velocity_score(item) == 4
+
+    def test_tier_below_threshold(self):
+        # 40 likes in 2 hours = 20/hr → 0pts
+        item = self._x_item(score=40, age_hours=2.0)
+        assert _velocity_score(item) == 0
+
+    def test_age_zero_no_division_error(self):
+        # Just-posted tweet: age_hours effectively 0 → floor at 0.5h, no ZeroDivisionError
+        ts = str(int(time.time()))
+        item = make_item(source="X - AI Trending", score=1000, published_at=ts)
+        result = _velocity_score(item)
+        assert isinstance(result, int)
+        assert result >= 0
+
+    def test_momentum_beats_raw_count(self):
+        # 300 likes in 1h (300/hr) should score more than 500 likes in 6h (83/hr)
+        fast = self._x_item(score=300, age_hours=1.0)
+        slow = self._x_item(score=500, age_hours=6.0)
+        assert _velocity_score(fast) > _velocity_score(slow)

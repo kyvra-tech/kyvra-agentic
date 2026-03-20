@@ -1,7 +1,6 @@
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +22,15 @@ def init_db() -> None:
                     user_id   INTEGER PRIMARY KEY,
                     voice     TEXT    NOT NULL,
                     updated_at TEXT   NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS seen_items (
+                    url        TEXT    NOT NULL,
+                    module     TEXT    NOT NULL,
+                    title      TEXT    NOT NULL DEFAULT '',
+                    seen_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+                    PRIMARY KEY (url, module)
                 )
             """)
             conn.commit()
@@ -62,3 +70,45 @@ def get_voice_profile(user_id: int) -> str | None:
     except sqlite3.OperationalError as e:
         logger.error("[Memory] Failed to load voice profile for user %s: %s", user_id, e)
         return None
+
+
+# ── Seen-item tracking (story continuity / Phase 1) ───────────────────────────
+
+def get_seen_urls(module: str, days: int = 7) -> set[str]:
+    """Return URLs already reported for this module within the last N days.
+
+    Returns empty set on any DB error so pipeline degrades gracefully.
+    """
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT url FROM seen_items
+                WHERE module = ?
+                  AND seen_at >= datetime('now', ?)
+                """,
+                (module, f"-{days} days"),
+            ).fetchall()
+            return {row["url"] for row in rows}
+    except sqlite3.OperationalError as e:
+        logger.warning("[Memory] get_seen_urls failed, treating as empty: %s", e)
+        return set()
+
+
+def mark_seen(urls: list[str], module: str) -> None:
+    """Record URLs as seen for this module. Duplicate-safe (REPLACE)."""
+    if not urls:
+        return
+    try:
+        with _connect() as conn:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO seen_items (url, module, seen_at)
+                VALUES (?, ?, datetime('now'))
+                """,
+                [(url, module) for url in urls],
+            )
+            conn.commit()
+        logger.info("[Memory] Marked %d items as seen for module '%s'", len(urls), module)
+    except sqlite3.OperationalError as e:
+        logger.warning("[Memory] mark_seen failed (report still delivered): %s", e)
