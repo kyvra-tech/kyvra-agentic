@@ -40,6 +40,7 @@ Generate a DAILY INDIE REPORT:
 [For each item:]
 **N. [emoji] [Short title]** | Confidence: XX/100
 📌 [1-2 sentences: WHY it matters for indie builders]
+🔗 Source: [URL from the item]
 🛠 Builder takeaway: "[One specific actionable insight]"
 🎯 Content angle: "[Hook for Twitter/newsletter/YouTube]"
 

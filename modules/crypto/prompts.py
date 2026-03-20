@@ -47,6 +47,7 @@ Generate a DAILY CRYPTO REPORT in the following format (English, sharp, data-awa
 [For each item, write in this format:]
 **N. [emoji] [Short event title]** | Confidence: XX/100
 📌 [1-2 sentences: WHY it matters — price impact, protocol risk, narrative shift, or institutional signal]
+🔗 Source: [URL from the item]
 📊 Signal: [BULLISH / BEARISH / NEUTRAL] — [one-line reason]
 🎯 Content angle: "[Specific CT thread hook, newsletter angle, or YouTube breakdown idea]"
 

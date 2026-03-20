@@ -44,6 +44,7 @@ Generate a DAILY VIETNAM TECH REPORT in the following format:
 [For each item, write in this format:]
 **N. [emoji] [Short event title]** | Confidence: XX/100
 📌 [1-2 sentences: WHY it matters for Vietnamese founders, investors, or builders]
+🔗 Source: [URL from the item]
 🎯 Content angle: "[Specific suggestion for Vietnamese or SEA audience]"
 
 ---
