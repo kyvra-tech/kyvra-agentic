@@ -1,7 +1,7 @@
 # TODOS — Kyvra Agentic
 
 Deferred work from engineering reviews. Items are ordered by priority within each phase.
-Last updated: 2026-03-20 (Phase 1 signal quality shipped)
+Last updated: 2026-03-20 (T-025 /setvoice shipped)
 
 ---
 
@@ -261,7 +261,7 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 
 ---
 
-### T-025: /setvoice — user voice profile injection ← P1 NEXT
+### T-025: /setvoice — user voice profile injection ✅ DONE
 **What:** `/setvoice [description]` saves the user's writing style to `user_voices` SQLite table (schema already live in `services/memory.py`). Voice profile is injected into all content format prompts. `/setvoice` with no args shows current profile. `/setvoice clear` resets it.
 **Why:** This is the core product differentiator. Output from `/thread`, `/newsletter`, `/script` should sound like *the user wrote it*, not generic AI. A creator who sets their voice gets dramatically better, shareable content.
 **Pros:** Persistent voice = consistent brand. Zero extra API cost. Immediate perceived quality jump.

@@ -5,6 +5,7 @@ from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
 from config import ACTIVE_MODULE
+import services.memory as memory
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/script – TikTok/Reels voiceover script\n"
         "/status – Source health & item count check\n"
         "/chat [msg] – Chat about today's news\n"
+        "/setvoice [description] – Set your writing style/voice\n"
         "/module [tech|crypto|vietnam|indie] – Switch focus module\n\n"
         "Try `/update` for a quick check! ⚡"
     )
@@ -97,6 +99,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "📊 */status* – Source health check: items fetched, top score, spikes\n"
         "💬 */chat [question]* – Chat about today's news\n"
         "   e.g. `/chat What's new with OpenAI today?`\n"
+        "🎙 */setvoice [description]* – Set your writing voice for all content\n"
+        "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
         "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n\n"
         "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
     )
@@ -182,11 +186,12 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/brief — 3-bullet shareable summary of today's top stories."""
-    logger.info(f"[Analytics] user={update.effective_user.id} command=brief module={_active_module}")
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} command=brief module={_active_module}")
     msg = await update.message.reply_text("⚡ Writing today's brief...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        brief = await supervisor.generate_brief()
+        brief = await supervisor.generate_brief(user_id=user_id)
     except Exception as e:
         logger.error(f"Brief generation failed: {e}")
         await msg.edit_text("❌ Could not generate brief. Please try again later.")
@@ -199,11 +204,12 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/thread — generate a 7-tweet Twitter thread from today's top story."""
-    logger.info(f"[Analytics] user={update.effective_user.id} command=thread module={_active_module}")
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} command=thread module={_active_module}")
     msg = await update.message.reply_text("🧵 Writing thread from today's top story... (30-60 sec)")
     try:
         supervisor = SupervisorAgent(_get_module())
-        thread = await supervisor.generate_thread()
+        thread = await supervisor.generate_thread(user_id=user_id)
     except Exception as e:
         logger.error(f"Thread generation failed: {e}")
         await msg.edit_text("❌ Could not generate thread. Please try again later.")
@@ -282,11 +288,12 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/newsletter — generate a newsletter section from today's top story."""
-    logger.info(f"[Analytics] user={update.effective_user.id} command=newsletter module={_active_module}")
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} command=newsletter module={_active_module}")
     msg = await update.message.reply_text("📰 Writing newsletter section from today's top story...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        newsletter = await supervisor.generate_newsletter()
+        newsletter = await supervisor.generate_newsletter(user_id=user_id)
     except Exception as e:
         logger.error(f"Newsletter generation failed: {e}")
         await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
@@ -298,11 +305,12 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/script — generate a TikTok/Reels voiceover script from today's top story."""
-    logger.info(f"[Analytics] user={update.effective_user.id} command=script module={_active_module}")
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} command=script module={_active_module}")
     msg = await update.message.reply_text("🎬 Writing voiceover script from today's top story...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        script = await supervisor.generate_script()
+        script = await supervisor.generate_script(user_id=user_id)
     except Exception as e:
         logger.error(f"Script generation failed: {e}")
         await msg.edit_text("❌ Could not generate script. Please try again later.")
@@ -310,6 +318,41 @@ async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await msg.delete()
     for chunk in split_long_message(script):
         await update.message.reply_text(chunk)
+
+
+async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/setvoice [description] — save a personal writing voice/style profile."""
+    user_id = update.effective_user.id
+    voice = " ".join(context.args)[:500].replace("\n", " ").strip() if context.args else ""
+
+    if not voice:
+        current = memory.get_voice_profile(user_id)
+        if current:
+            await update.message.reply_text(
+                f"🎙 *Your current voice profile:*\n_{current}_\n\n"
+                "To update it: `/setvoice Casual, punchy, uses data and metaphors`\n"
+                "To clear it: `/setvoice clear`",
+            )
+        else:
+            await update.message.reply_text(
+                "🎙 No voice profile set yet.\n\n"
+                "Usage: `/setvoice [your writing style description]`\n"
+                "Example: `/setvoice Casual, punchy, uses data and metaphors, builder tone`",
+            )
+        return
+
+    if voice.lower() == "clear":
+        memory.save_voice_profile(user_id, "")
+        logger.info(f"[Analytics] user={user_id} command=setvoice action=clear")
+        await update.message.reply_text("🗑 Voice profile cleared.")
+        return
+
+    memory.save_voice_profile(user_id, voice)
+    logger.info(f"[Analytics] user={user_id} command=setvoice action=set")
+    await update.message.reply_text(
+        f"✅ Voice profile saved!\n\n_{voice}_\n\n"
+        "All content formats (/thread, /brief, /newsletter, /script) will now use your voice.",
+    )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
