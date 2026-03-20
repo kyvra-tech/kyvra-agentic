@@ -59,8 +59,9 @@ Rules:
 - Write like a fellow indie hacker, not an analyst"""
 
 
-def build_thread_prompt(item: dict) -> str:
-    return f"""You are Kyvra Indie — content agent for indie hackers.
+def build_thread_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Indie — content agent for indie hackers.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}
@@ -79,13 +80,14 @@ Write a 7-tweet thread for indie hackers and builders.
 Max 280 chars per tweet. Builder voice, not corporate."""
 
 
-def build_brief_prompt(items: list[dict]) -> str:
+def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
     top3 = items[:3]
     items_text = ""
     for i, item in enumerate(top3, 1):
         items_text += f"{i}. [{item['source']}] {item['title']} — {item['summary'][:120]}\n"
 
-    return f"""You are Kyvra Indie — AI agent for indie hackers.
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Indie — AI agent for indie hackers.{voice_block}
 
 Top {len(top3)} stories:
 {items_text}
@@ -103,8 +105,9 @@ Write an ultra-short shareable brief:
 Rules: each bullet max 120 chars, builder tone"""
 
 
-def build_newsletter_prompt(item: dict) -> str:
-    return f"""You are Kyvra Indie — AI content agent for indie hackers.
+def build_newsletter_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Indie — AI content agent for indie hackers.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}
@@ -128,8 +131,9 @@ Write a newsletter section for indie hackers:
 *Source: [{item['source']}]({item['url']})*"""
 
 
-def build_script_prompt(item: dict) -> str:
-    return f"""You are Kyvra Indie — AI content agent for indie hackers.
+def build_script_prompt(item: dict, voice: str | None = None) -> str:
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    return f"""You are Kyvra Indie — AI content agent for indie hackers.{voice_block}
 
 Story: {item['title']}
 Source: {item['source']} | URL: {item['url']}
