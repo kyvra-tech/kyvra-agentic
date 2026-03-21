@@ -192,6 +192,31 @@ class SupervisorAgent:
             user_id=user_id,
         )
 
+    async def generate_report_with_ctx(self) -> tuple[str, "PipelineContext | None"]:
+        """Full pipeline — returns (report_text, ctx) so callers can access top_items."""
+        logger.info("[Supervisor] Starting full pipeline (with ctx)...")
+        ctx = await self._collect_and_score()
+
+        if not ctx.raw_items:
+            return "No news today. Try again later!", None
+
+        ctx = await self.writer.run(ctx)
+
+        if ctx.top_items:
+            memory.mark_seen([i.url for i in ctx.top_items], self.module.name)
+            _STATUS_CACHE[self.module.name] = {
+                "timestamp": time.time(),
+                "status": self._build_status_dict(ctx),
+            }
+
+        if ctx.errors:
+            logger.warning(f"[Supervisor] {len(ctx.errors)} error(s): {ctx.errors}")
+            footer = f"\n\n⚠️ _{len(ctx.errors)} source(s) had issues and were skipped._"
+            report = ctx.report_text or "Could not generate report."
+            return report + footer, ctx
+        logger.info("[Supervisor] Pipeline complete.")
+        return ctx.report_text or "Could not generate report.", ctx
+
     async def generate_report_for_topic(self, topic: str) -> str:
         """Full pipeline scoped to items matching a topic keyword."""
         logger.info(f"[Supervisor] Topic pipeline: '{topic}'")
@@ -217,6 +242,13 @@ async def generate_report_for_module(module_name: str) -> str:
     module = load_module(module_name)
     supervisor = SupervisorAgent(module)
     return await supervisor.generate_report()
+
+
+async def generate_report_for_module_with_ctx(module_name: str):
+    """Like generate_report_for_module but also returns the pipeline context (for TrendPost push)."""
+    module = load_module(module_name)
+    supervisor = SupervisorAgent(module)
+    return await supervisor.generate_report_with_ctx()
 
 
 def load_module(module_name: str) -> BaseModule:

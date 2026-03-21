@@ -19,6 +19,19 @@ def _signal_label(item: ScoredItem) -> str:
     return "⬜ SIGNAL"
 
 
+def _signal_label_key(item: ScoredItem) -> str:
+    """Return clean signal key for API/DB (no emoji, no reason text)."""
+    if item.is_spike and item.cross_source_count >= 2:
+        return "VIRAL"
+    if item.is_spike:
+        return "VIRAL"
+    if item.confidence_score >= 80:
+        return "RISING"
+    if item.confidence_score >= 60:
+        return "STEADY"
+    return "SIGNAL"
+
+
 def format_update(items: list[ScoredItem], total_fetched: int) -> str:
     now = datetime.now(_VN_TZ).strftime("%H:%M GMT+7")
     lines = [f"⚡ Quick Update — {now}", f"{total_fetched} items scanned across all sources\n"]
