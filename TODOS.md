@@ -1,7 +1,7 @@
 # TODOS — Kyvra Agentic
 
 Deferred work from engineering reviews. Items are ordered by priority within each phase.
-Last updated: 2026-03-20 (T-025 /setvoice shipped)
+Last updated: 2026-03-20 (T-027–T-029 added from Kyvra↔TrendPost CEO review)
 
 ---
 
@@ -258,6 +258,46 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 **Effort:** S
 **Priority:** P2
 **Depends on:** 7 days of production data after Phase 1 ships
+
+---
+
+---
+
+## Phase 5 — Kyvra ↔ TrendPost Integration (from CEO review 2026-03-20)
+
+### T-027: Fix PostgresError in TrendPost Kyvra webhook handler
+**What:** In TrendPost's `webhooks.routes.ts` (or controller), catch `PostgresError` during `kyvra_stories` insert and return `200 { accepted: false, reason: 'db_error' }` instead of an unhandled 500. Log `ERROR` internally.
+**Why:** If TrendPost's DB is temporarily down at 8AM and Kyvra pushes stories, the 500 causes Kyvra to retry 3× aggressively. All retries fail, and the day's stories are silently lost. Returning 200 stops retry spam while leaving an internal log trail.
+**Pros:** Graceful DB degradation. Kyvra doesn't retry needlessly. Error is logged and visible.
+**Cons:** TrendPost returns 200 even when insertion failed — accepted as trade-off for retry behaviour.
+**Context:** `creator-backend/src/routes/webhooks.routes.ts` (new file in integration). Kyvra retries 3× on 5xx. A 200 response stops retries.
+**Effort:** XS
+**Priority:** P1
+**Depends on:** Integration implementation (Kyvra webhook push + TrendPost webhook route)
+
+---
+
+### T-028: Clamp and rate-limit /signal/performance feedback signals
+**What:** In Kyvra's new `POST /signal/performance` endpoint (`interfaces/web/app.py`): (1) clamp `delta` to `[-5, +5]`, (2) validate `story_url` exists in DB or return 404, (3) rate-limit to 1 signal per `(user_id, story_url)` per day via a `seen_signals` SQLite table.
+**Why:** A buggy TrendPost deploy could send `delta=-100` for every published post, silently destroying source authority scores. The feedback loop must be bounded.
+**Pros:** Authority scores remain meaningful. Feedback loop is safe to enable.
+**Cons:** Rate-limit table adds minor DB overhead. Clamp means viral posts cap at +5/day.
+**Context:** `interfaces/web/app.py` — new `POST /signal/performance` endpoint. `services/memory.py` — add `seen_signals` table: `signal_key TEXT PK, sent_at TEXT`.
+**Effort:** S
+**Priority:** P1
+**Depends on:** Analytics feedback loop integration
+
+---
+
+### T-029: Add kyvra_story_id tracking to TrendPost posts table
+**What:** Add optional `kyvra_story_id INTEGER REFERENCES kyvra_stories(id)` column to TrendPost's `schedules` (or posts) table. Populate when user generates content from Kyvra Feed Tab. Use in `processScheduledPosts()` to emit performance signal to Kyvra after successful publish.
+**Why:** The analytics feedback loop needs to know which Kyvra story a post was generated from. Without this FK, performance signals can't be attributed to sources.
+**Pros:** Enables the full feedback loop. Source authority improves over time based on real publishing outcomes.
+**Cons:** DB migration required. `kyvra_story_id` is null for non-Kyvra posts.
+**Context:** `creator-backend/src/migrations/` — add column. `creator-backend/src/services/schedule.service.ts` — after publish, if `kyvra_story_id` non-null, call `kyvraClient.sendPerformanceSignal()`.
+**Effort:** S
+**Priority:** P2
+**Depends on:** T-028 (signal endpoint must be safe before enabling feedback)
 
 ---
 
