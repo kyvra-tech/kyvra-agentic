@@ -32,3 +32,6 @@ CACHE_TTL = 3600
 # TrendPost integration (optional — disabled when URL is empty)
 TRENDPOST_WEBHOOK_URL = os.getenv("TRENDPOST_WEBHOOK_URL", "")
 TRENDPOST_WEBHOOK_SECRET = os.getenv("TRENDPOST_WEBHOOK_SECRET", "")
+
+# TrendPost backend base URL (for /link verification and STOP cancellation)
+TRENDPOST_API_URL = os.getenv("TRENDPOST_API_URL", "")  # e.g. https://api.trendpost.co

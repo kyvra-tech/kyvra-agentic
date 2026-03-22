@@ -1,10 +1,18 @@
+import hashlib
+import hmac
+import json
 import logging
+import random
+import string
+from datetime import datetime, timedelta, timezone
+
+import httpx
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, MessageHandler, filters
 from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
-from config import ACTIVE_MODULE
+from config import ACTIVE_MODULE, TRENDPOST_API_URL, TRENDPOST_WEBHOOK_SECRET
 import services.memory as memory
 
 logger = logging.getLogger(__name__)
@@ -78,7 +86,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/status – Source health & item count check\n"
         "/chat [msg] – Chat about today's news\n"
         "/setvoice [description] – Set your writing style/voice\n"
-        "/module [tech|crypto|vietnam|indie] – Switch focus module\n\n"
+        "/module [tech|crypto|vietnam|indie] – Switch focus module\n"
+        "/link – Link this Telegram to your TrendPost account (enables auto-post)\n\n"
         "Try `/update` for a quick check! ⚡"
     )
     await update.message.reply_text(text)
@@ -101,7 +110,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "🎙 */setvoice [description]* – Set your writing voice for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
-        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n\n"
+        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n"
+        "🔗 */link* – Link this Telegram to TrendPost (enables auto-post + STOP command)\n\n"
         "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
     )
     await update.message.reply_text(text)
@@ -353,6 +363,115 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"✅ Voice profile saved!\n\n_{voice}_\n\n"
         "All content formats (/thread, /brief, /newsletter, /script) will now use your voice.",
     )
+
+
+async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/link — generate a one-time 6-digit code to link this Telegram account to TrendPost web app."""
+    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
+        await update.message.reply_text(
+            "⚠️ TrendPost integration is not configured. Contact support."
+        )
+        return
+
+    chat_id = str(update.effective_chat.id)
+    code = "".join(random.choices(string.digits, k=6))
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+
+    # Store the code in TrendPost so the web UI can verify it
+    payload = {"telegram_chat_id": chat_id, "code": code, "expires_at": expires_at}
+    body = json.dumps(payload, separators=(",", ":"))
+    sig = "sha256=" + hmac.new(
+        TRENDPOST_WEBHOOK_SECRET.encode(),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{TRENDPOST_API_URL}/api/webhooks/kyvra-link",
+                content=body,
+                headers={"Content-Type": "application/json", "x-kyvra-signature": sig},
+            )
+        if resp.status_code not in (200, 201):
+            logger.error(f"cmd_link: TrendPost returned {resp.status_code}: {resp.text}")
+            await update.message.reply_text(
+                "❌ Could not generate link code. Please try again in a moment."
+            )
+            return
+    except Exception as e:
+        logger.error(f"cmd_link: request failed: {e}")
+        await update.message.reply_text(
+            "❌ Could not reach TrendPost. Please try again in a moment."
+        )
+        return
+
+    await update.message.reply_text(
+        f"🔗 *Link your TrendPost account*\n\n"
+        f"Enter this code in TrendPost → Settings → Telegram:\n\n"
+        f"```\n{code}\n```\n\n"
+        f"Code expires in *5 minutes*. Run /link again if it expires.",
+        parse_mode="Markdown",
+    )
+    logger.info(f"cmd_link: code generated for chat_id={chat_id}")
+
+
+async def handle_stop_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Plain-text message handler for 'STOP' (case-insensitive).
+    Cancels the most recent pending_approval auto-post for this Telegram chat.
+    """
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().upper()
+    if text != "STOP":
+        return
+
+    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
+        return
+
+    chat_id = str(update.effective_chat.id)
+    logger.info(f"handle_stop_message: STOP received from chat_id={chat_id}")
+
+    payload = {"telegram_chat_id": chat_id}
+    body = json.dumps(payload, separators=(",", ":"))
+    sig = "sha256=" + hmac.new(
+        TRENDPOST_WEBHOOK_SECRET.encode(),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{TRENDPOST_API_URL}/api/webhooks/kyvra-stop",
+                content=body,
+                headers={"Content-Type": "application/json", "x-kyvra-signature": sig},
+            )
+
+        if resp.status_code == 200:
+            await update.message.reply_text(
+                "✅ Got it — today's auto-post has been cancelled."
+            )
+        elif resp.status_code == 404:
+            await update.message.reply_text(
+                "ℹ️ No pending auto-post found to cancel."
+            )
+        elif resp.status_code == 409:
+            await update.message.reply_text(
+                "ℹ️ The post has already been sent or was already cancelled."
+            )
+        else:
+            logger.warning(f"handle_stop_message: unexpected status {resp.status_code}: {resp.text}")
+            await update.message.reply_text(
+                "⚠️ Could not cancel the post. Please check TrendPost directly."
+            )
+    except Exception as e:
+        logger.error(f"handle_stop_message: request failed: {e}")
+        await update.message.reply_text(
+            "⚠️ Could not reach TrendPost to cancel. Please check the app directly."
+        )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
