@@ -1,10 +1,18 @@
+import hashlib
+import hmac
+import json
 import logging
+import random
+import string
+from datetime import datetime, timedelta, timezone
+
+import httpx
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, MessageHandler, filters
 from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
-from config import ACTIVE_MODULE
+from config import ACTIVE_MODULE, TRENDPOST_API_URL, TRENDPOST_WEBHOOK_SECRET
 import services.memory as memory
 
 logger = logging.getLogger(__name__)
@@ -78,7 +86,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/status – Source health & item count check\n"
         "/chat [msg] – Chat about today's news\n"
         "/setvoice [description] – Set your writing style/voice\n"
-        "/module [tech|crypto|vietnam|indie] – Switch focus module\n\n"
+        "/module [tech|crypto|vietnam|indie] – Switch focus module\n"
+        "/link – Link this Telegram to your TrendPost account (enables auto-post)\n\n"
         "Try `/update` for a quick check! ⚡"
     )
     await update.message.reply_text(text)
@@ -101,7 +110,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "   e.g. `/chat What's new with OpenAI today?`\n"
         "🎙 */setvoice [description]* – Set your writing voice for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
-        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n\n"
+        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n"
+        "🔗 */link* – Link this Telegram to TrendPost (enables auto-post + STOP command)\n\n"
         "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
     )
     await update.message.reply_text(text)
@@ -184,14 +194,30 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(chunk)
 
 
+def _parse_rank(args: list[str], max_rank: int = 7) -> tuple[int, str | None]:
+    """Parse optional rank argument from command args. Returns (rank, error_message_or_None)."""
+    if not args:
+        return 1, None
+    try:
+        rank = int(args[0])
+        if rank < 1 or rank > max_rank:
+            return 1, f"Rank must be between 1 and {max_rank}. Using story #1."
+        return rank, None
+    except ValueError:
+        return 1, f"'{args[0]}' is not a valid rank. Usage: /thread 2 (for story #2). Using #1."
+
+
 async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/brief — 3-bullet shareable summary of today's top stories."""
+    """/brief [rank] — 3-bullet shareable summary. /brief 2 = from story #2."""
     user_id = update.effective_user.id
-    logger.info(f"[Analytics] user={user_id} command=brief module={_active_module}")
+    rank, err = _parse_rank(context.args or [])
+    if err:
+        await update.message.reply_text(f"ℹ️ {err}")
+    logger.info(f"[Analytics] user={user_id} command=brief module={_active_module} rank={rank}")
     msg = await update.message.reply_text("⚡ Writing today's brief...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        brief = await supervisor.generate_brief(user_id=user_id)
+        brief = await supervisor.generate_brief(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Brief generation failed: {e}")
         await msg.edit_text("❌ Could not generate brief. Please try again later.")
@@ -203,13 +229,17 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/thread — generate a 7-tweet Twitter thread from today's top story."""
+    """/thread [rank] — 7-tweet Twitter thread. /thread 2 = from story #2."""
     user_id = update.effective_user.id
-    logger.info(f"[Analytics] user={user_id} command=thread module={_active_module}")
-    msg = await update.message.reply_text("🧵 Writing thread from today's top story... (30-60 sec)")
+    rank, err = _parse_rank(context.args or [])
+    if err:
+        await update.message.reply_text(f"ℹ️ {err}")
+    logger.info(f"[Analytics] user={user_id} command=thread module={_active_module} rank={rank}")
+    label = f"story #{rank}" if rank > 1 else "today's top story"
+    msg = await update.message.reply_text(f"🧵 Writing thread from {label}... (30-60 sec)")
     try:
         supervisor = SupervisorAgent(_get_module())
-        thread = await supervisor.generate_thread(user_id=user_id)
+        thread = await supervisor.generate_thread(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Thread generation failed: {e}")
         await msg.edit_text("❌ Could not generate thread. Please try again later.")
@@ -287,13 +317,17 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/newsletter — generate a newsletter section from today's top story."""
+    """/newsletter [rank] — newsletter section. /newsletter 2 = from story #2."""
     user_id = update.effective_user.id
-    logger.info(f"[Analytics] user={user_id} command=newsletter module={_active_module}")
-    msg = await update.message.reply_text("📰 Writing newsletter section from today's top story...")
+    rank, err = _parse_rank(context.args or [])
+    if err:
+        await update.message.reply_text(f"ℹ️ {err}")
+    logger.info(f"[Analytics] user={user_id} command=newsletter module={_active_module} rank={rank}")
+    label = f"story #{rank}" if rank > 1 else "today's top story"
+    msg = await update.message.reply_text(f"📰 Writing newsletter section from {label}...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        newsletter = await supervisor.generate_newsletter(user_id=user_id)
+        newsletter = await supervisor.generate_newsletter(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Newsletter generation failed: {e}")
         await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
@@ -304,13 +338,17 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/script — generate a TikTok/Reels voiceover script from today's top story."""
+    """/script [rank] — voiceover script. /script 2 = from story #2."""
     user_id = update.effective_user.id
-    logger.info(f"[Analytics] user={user_id} command=script module={_active_module}")
-    msg = await update.message.reply_text("🎬 Writing voiceover script from today's top story...")
+    rank, err = _parse_rank(context.args or [])
+    if err:
+        await update.message.reply_text(f"ℹ️ {err}")
+    logger.info(f"[Analytics] user={user_id} command=script module={_active_module} rank={rank}")
+    label = f"story #{rank}" if rank > 1 else "today's top story"
+    msg = await update.message.reply_text(f"🎬 Writing voiceover script from {label}...")
     try:
         supervisor = SupervisorAgent(_get_module())
-        script = await supervisor.generate_script(user_id=user_id)
+        script = await supervisor.generate_script(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Script generation failed: {e}")
         await msg.edit_text("❌ Could not generate script. Please try again later.")
@@ -353,6 +391,103 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"✅ Voice profile saved!\n\n_{voice}_\n\n"
         "All content formats (/thread, /brief, /newsletter, /script) will now use your voice.",
     )
+
+
+async def _post_to_trendpost(path: str, payload: dict, timeout: int = 5) -> dict | None:
+    """
+    Sign and POST a payload to creator-backend via HMAC-SHA256.
+    Returns parsed JSON response dict, or None on network/HTTP error.
+    Caller is responsible for checking response content.
+    """
+    body = json.dumps(payload, separators=(",", ":"))
+    sig = "sha256=" + hmac.new(
+        TRENDPOST_WEBHOOK_SECRET.encode(),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{TRENDPOST_API_URL}{path}",
+                content=body,
+                headers={"Content-Type": "application/json", "x-kyvra-signature": sig},
+            )
+        return {"status_code": resp.status_code, "data": resp.json() if resp.text else {}}
+    except Exception as e:
+        logger.error(f"_post_to_trendpost {path}: request failed: {e}")
+        return None
+
+
+async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/link — generate a one-time 6-digit code to link this Telegram account to TrendPost web app."""
+    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
+        await update.message.reply_text(
+            "⚠️ TrendPost integration is not configured. Contact support."
+        )
+        return
+
+    chat_id = str(update.effective_chat.id)
+    code = "".join(random.choices(string.digits, k=6))
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+
+    # Store the code in TrendPost so the web UI can verify it
+    result = await _post_to_trendpost(
+        "/api/webhooks/kyvra-link",
+        {"telegram_chat_id": chat_id, "code": code, "expires_at": expires_at},
+    )
+    if result is None or result["status_code"] not in (200, 201):
+        status = result["status_code"] if result else "unreachable"
+        logger.error(f"cmd_link: TrendPost returned {status}")
+        await update.message.reply_text(
+            "❌ Could not generate link code. Please try again in a moment."
+        )
+        return
+
+    await update.message.reply_text(
+        f"🔗 *Link your TrendPost account*\n\n"
+        f"Enter this code in TrendPost → Settings → Telegram:\n\n"
+        f"```\n{code}\n```\n\n"
+        f"Code expires in *5 minutes*. Run /link again if it expires.",
+        parse_mode="Markdown",
+    )
+    logger.info(f"cmd_link: code generated for chat_id={chat_id}")
+
+
+async def handle_stop_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Plain-text message handler for 'STOP' (case-insensitive).
+    Cancels the most recent pending_approval auto-post for this Telegram chat.
+    """
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().upper()
+    if text != "STOP":
+        return
+
+    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
+        return
+
+    chat_id = str(update.effective_chat.id)
+    logger.info(f"handle_stop_message: STOP received from chat_id={chat_id}")
+
+    result = await _post_to_trendpost("/api/webhooks/kyvra-stop", {"telegram_chat_id": chat_id})
+
+    if result is None:
+        await update.message.reply_text(
+            "⚠️ Could not reach TrendPost to cancel. Please check the app directly."
+        )
+    elif result["status_code"] == 200:
+        await update.message.reply_text("✅ Got it — today's auto-post has been cancelled.")
+    elif result["status_code"] == 404:
+        await update.message.reply_text("ℹ️ No pending auto-post found to cancel.")
+    elif result["status_code"] == 409:
+        await update.message.reply_text("ℹ️ The post has already been sent or was already cancelled.")
+    else:
+        logger.warning(f"handle_stop_message: unexpected status {result['status_code']}")
+        await update.message.reply_text(
+            "⚠️ Could not cancel the post. Please check TrendPost directly."
+        )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

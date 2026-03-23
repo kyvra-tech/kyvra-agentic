@@ -21,11 +21,12 @@ Auth: Bearer token via Authorization header (API_KEY env var).
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
@@ -78,6 +79,17 @@ class ChatRequest(BaseModel):
     message: str
     history: list[dict[str, str]] = []
     user_id: int | None = None
+
+
+class PerformanceSignalRequest(BaseModel):
+    story_url: str
+    user_id: int
+    delta: float
+
+    @field_validator("delta")
+    @classmethod
+    def clamp_delta(cls, v: float) -> float:
+        return max(-5.0, min(5.0, v))
 
 
 class VoiceRequest(BaseModel):
@@ -243,6 +255,26 @@ async def chat(req: ChatRequest) -> TextResponse:
     system_prompt = load_module(req.module).get_chat_system_prompt()
     reply = await chat_with_llm(message, system_prompt, req.history[-20:])
     return TextResponse(module=req.module, result=reply)
+
+
+@app.post("/signal/performance", tags=["analytics"], dependencies=[Depends(_verify_token)])
+async def performance_signal(req: PerformanceSignalRequest) -> dict:
+    """Record a post-performance signal for a story.
+
+    Rate-limited to 1 signal per (user_id, story_url) per UTC calendar day.
+    Delta is clamped to [-5, +5] before storage.
+    """
+    story_url = req.story_url.strip()
+    if not story_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="story_url is required")
+
+    date_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    recorded = memory.record_performance_signal(req.user_id, story_url, req.delta, date_utc)
+
+    if not recorded:
+        return {"accepted": False, "reason": "duplicate"}
+
+    return {"accepted": True}
 
 
 @app.post("/voice", response_model=VoiceResponse, tags=["voice"], dependencies=[Depends(_verify_token)])
