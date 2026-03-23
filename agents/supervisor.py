@@ -102,6 +102,7 @@ class SupervisorAgent:
         max_tokens: int,
         use_top3: bool = False,
         user_id: int | None = None,
+        rank: int = 1,
     ) -> str:
         """Shared pipeline for single-item (or top-3) content format generation.
 
@@ -110,9 +111,10 @@ class SupervisorAgent:
         max_tokens   — passed to LLM
         use_top3     — True for brief (top-3 items), False for thread/newsletter/script (top-1)
         user_id      — Telegram user ID; used to load voice profile from memory
+        rank         — 1-based index into top_items by confidence_score (default: 1 = highest)
         """
         import services.llm as llm
-        logger.info("[Supervisor] %s generation started...", format_name.capitalize())
+        logger.info("[Supervisor] %s generation started (rank=%d)...", format_name.capitalize(), rank)
         ctx = await self._collect_and_score()
 
         if not ctx.top_items:
@@ -120,10 +122,14 @@ class SupervisorAgent:
 
         voice = memory.get_voice_profile(user_id) if user_id is not None else None
 
+        # Clamp rank to available items (rank is 1-based)
+        clamped_rank = max(1, min(rank, len(ctx.top_items)))
+        selected_item = ctx.top_items[clamped_rank - 1]
+
         if use_top3:
             payload = [self._item_dict(i) for i in ctx.top_items[:3]]
         else:
-            payload = self._item_dict(ctx.top_items[0])
+            payload = self._item_dict(selected_item)
 
         prompt = get_prompt(payload, voice)
         try:
@@ -134,7 +140,7 @@ class SupervisorAgent:
         logger.info("[Supervisor] %s generated.", format_name.capitalize())
         return result
 
-    async def generate_brief(self, user_id: int | None = None) -> str:
+    async def generate_brief(self, user_id: int | None = None, rank: int = 1) -> str:
         """Generate a 3-bullet shareable brief from today's top 3 items."""
         return await self._generate_content_format(
             "brief",
@@ -142,15 +148,17 @@ class SupervisorAgent:
             400,
             use_top3=True,
             user_id=user_id,
+            rank=rank,
         )
 
-    async def generate_thread(self, user_id: int | None = None) -> str:
+    async def generate_thread(self, user_id: int | None = None, rank: int = 1) -> str:
         """Generate a Twitter thread from today's top-scored item."""
         return await self._generate_content_format(
             "thread",
             lambda item, voice: self.module.get_thread_prompt(item, voice=voice),
             1200,
             user_id=user_id,
+            rank=rank,
         )
 
     def _build_status_dict(self, ctx: PipelineContext) -> dict:
@@ -174,22 +182,24 @@ class SupervisorAgent:
         _STATUS_CACHE[self.module.name] = {"timestamp": time.time(), "status": status}
         return status
 
-    async def generate_newsletter(self, user_id: int | None = None) -> str:
+    async def generate_newsletter(self, user_id: int | None = None, rank: int = 1) -> str:
         """Generate a newsletter section from today's top-scored item."""
         return await self._generate_content_format(
             "newsletter",
             lambda item, voice: self.module.get_newsletter_prompt(item, voice=voice),
             800,
             user_id=user_id,
+            rank=rank,
         )
 
-    async def generate_script(self, user_id: int | None = None) -> str:
+    async def generate_script(self, user_id: int | None = None, rank: int = 1) -> str:
         """Generate a TikTok/Reels voiceover script from today's top-scored item."""
         return await self._generate_content_format(
             "script",
             lambda item, voice: self.module.get_script_prompt(item, voice=voice),
             600,
             user_id=user_id,
+            rank=rank,
         )
 
     async def generate_report_with_ctx(self) -> tuple[str, "PipelineContext | None"]:

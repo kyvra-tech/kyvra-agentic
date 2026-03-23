@@ -33,6 +33,23 @@ def init_db() -> None:
                     PRIMARY KEY (url, module)
                 )
             """)
+            # Analytics feedback loop: one signal per (user_id, story_url) per UTC calendar day
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS seen_signals (
+                    key        TEXT    PRIMARY KEY,
+                    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS performance_signals (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id    INTEGER NOT NULL,
+                    story_url  TEXT    NOT NULL,
+                    delta      REAL    NOT NULL,
+                    date_utc   TEXT    NOT NULL,
+                    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
             conn.commit()
         logger.info("[Memory] SQLite initialized at %s", _DB_PATH)
     except sqlite3.OperationalError as e:
@@ -112,3 +129,35 @@ def mark_seen(urls: list[str], module: str) -> None:
         logger.info("[Memory] Marked %d items as seen for module '%s'", len(urls), module)
     except sqlite3.OperationalError as e:
         logger.warning("[Memory] mark_seen failed (report still delivered): %s", e)
+
+
+# ── Performance signal tracking (analytics feedback loop / T-028) ─────────────
+
+def record_performance_signal(user_id: int, story_url: str, delta: float, date_utc: str) -> bool:
+    """Record a performance signal.
+
+    Returns True if recorded, False if duplicate (same user_id + story_url + date_utc).
+    delta is clamped to [-5, +5] by the caller.
+    """
+    key = f"{user_id}:{story_url}:{date_utc}"
+    try:
+        with _connect() as conn:
+            existing = conn.execute(
+                "SELECT 1 FROM seen_signals WHERE key = ?", (key,)
+            ).fetchone()
+            if existing:
+                return False
+            conn.execute(
+                "INSERT INTO seen_signals (key) VALUES (?)", (key,)
+            )
+            conn.execute(
+                """INSERT INTO performance_signals (user_id, story_url, delta, date_utc)
+                   VALUES (?, ?, ?, ?)""",
+                (user_id, story_url, delta, date_utc),
+            )
+            conn.commit()
+        logger.info("[Memory] Performance signal recorded: user=%s delta=%+.1f url=%s", user_id, delta, story_url)
+        return True
+    except sqlite3.OperationalError as e:
+        logger.error("[Memory] record_performance_signal failed: %s", e)
+        return False
