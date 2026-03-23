@@ -141,18 +141,19 @@ async def update(module: str = Depends(_module_param)) -> dict:
     """Fast scan — top scored items, no LLM writing."""
     sv = _supervisor(module)
     ctx = await sv.quick_scan()
-    items = [
+    top_items = [
         {
             "title": i.title,
             "url": i.url,
             "source": i.source,
             "confidence_score": i.confidence_score,
+            "signal_label": "VIRAL" if i.is_spike else "RISING" if i.confidence_score >= 70 else "STEADY",
             "is_spike": i.is_spike,
             "published_at": i.published_at,
         }
         for i in ctx.top_items
     ]
-    return {"module": module, "total_fetched": len(ctx.raw_items), "items": items}
+    return {"module": module, "total_fetched": len(ctx.raw_items), "top_items": top_items, "generated_at": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/breaking", tags=["signal"], dependencies=[Depends(_verify_token)])
