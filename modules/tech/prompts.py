@@ -169,6 +169,24 @@ Rules:
 - Target 150-180 words total (60-75 sec at ~2.5 words/sec)"""
 
 
+def build_tweet_hook_prompt(item: dict) -> str:
+    return f"""You are a viral Twitter/X content writer.
+
+Story:
+Title: {item['title']}
+Source: {item['source']}
+URL: {item['url']}
+Summary: {item['summary']}
+
+Write exactly 1 tweet hook (max 280 characters) that:
+- Opens with a bold claim, surprising stat, or FOMO trigger
+- Makes someone stop scrolling and want to click the link
+- Ends with the URL on its own line
+
+Output ONLY the tweet text. No explanation, no label, no quotes.
+"""
+
+
 def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
     top3 = items[:3]
     items_text = ""

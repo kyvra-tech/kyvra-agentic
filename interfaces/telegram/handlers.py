@@ -7,8 +7,8 @@ import string
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from telegram import Update
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from agents.supervisor import SupervisorAgent, load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
@@ -71,50 +71,55 @@ async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "👋 Hey! I'm *Kyvra* – your AI content agent for Tech, AI & Crypto.\n\n"
-        "I monitor X/Twitter, GitHub Trending, top blogs and crypto media, "
-        "then distill it into a daily briefing with content angles every morning at 8 AM.\n\n"
-        "*Commands:*\n"
-        "/update – Fast news scan right now (no AI, ~10 sec)\n"
-        "/breaking – Spike alerts only\n"
-        "/topic [kw] – Report scoped to one topic\n"
-        "/report – Full AI-written daily report\n"
-        "/brief – 3-bullet summary, ready to share\n"
-        "/thread – 7-tweet thread from today's top story\n"
-        "/newsletter – Newsletter section from today's top story\n"
-        "/script – TikTok/Reels voiceover script\n"
-        "/status – Source health & item count check\n"
-        "/chat [msg] – Chat about today's news\n"
-        "/setvoice [description] – Set your writing style/voice\n"
-        "/module [tech|crypto|vietnam|indie] – Switch focus module\n"
-        "/link – Link this Telegram to your TrendPost account (enables auto-post)\n\n"
-        "Try `/update` for a quick check! ⚡"
+        "👋 Hey\\! I'm *Kyvra* – your AI content agent for Tech, AI & Crypto\\.\n\n"
+        "I monitor GitHub Trending, Reddit, RSS feeds and more, "
+        "then distill it into a daily briefing with content angles every morning at 8 AM\\.\n\n"
+        "*Quick start:*\n"
+        "⚡ `/update` – Fast news scan \\(~10 sec\\)\n"
+        "📋 `/report` – Full AI report \\+ tweet buttons\n"
+        "🎥 Paste a video link – get viral captions instantly\n\n"
+        "Type /help to see all features\\."
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="MarkdownV2")
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n\n"
-        "⚡ */update* – Fast scan, top scored items, no AI writing (~10 sec)\n"
-        "🚨 */breaking* – Spike items only (viral X tweets, trending signals)\n"
-        "🔍 */topic [keyword]* – AI report scoped to one topic\n"
-        "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
-        "📋 */report* – Full daily report with content angles (30-60 sec)\n"
+        f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n"
+        f"Powered by Ollama (Gemma 3) + DeepSeek\n\n"
+
+        "━━━ 📡 NEWS & INTEL ━━━\n"
+        "⚡ */update* – Fast scan of latest news, no AI writing (~10 sec)\n"
+        "🚨 */breaking* – Spike alerts only — viral or trending signals\n"
+        "🔍 */topic \\[keyword\\]* – AI report scoped to one topic\n"
+        "   e.g. `/topic openai` `/topic bitcoin`\n"
+        "📋 */report* – Full AI daily report with content angles (30-60 sec)\n"
+        "   _Each story has a_ 🐦 _Tweet button — tap to copy a viral tweet hook_\n"
+        "📊 */status* – Source health: items fetched, top score, spikes\n\n"
+
+        "━━━ ✍️ CONTENT CREATION ━━━\n"
         "⚡ */brief* – 3-bullet summary, screenshot-ready\n"
         "🧵 */thread* – 7-tweet X thread from today's top story\n"
         "📰 */newsletter* – Newsletter section from today's top story\n"
-        "🎬 */script* – TikTok/Reels voiceover script from today's top story\n"
-        "📊 */status* – Source health check: items fetched, top score, spikes\n"
-        "💬 */chat [question]* – Chat about today's news\n"
-        "   e.g. `/chat What's new with OpenAI today?`\n"
-        "🎙 */setvoice [description]* – Set your writing voice for all content\n"
+        "🎬 */script* – TikTok/Reels voiceover script (60-90 sec)\n"
+        "💬 */chat \\[question\\]* – Chat about today's news\n"
+        "   e.g. `/chat What's the biggest AI story today?`\n\n"
+
+        "━━━ 🎥 VIDEO / IMAGE CAPTION ━━━\n"
+        "🔗 *Paste any video/image link* directly in chat\n"
+        "   _or use_ */caption \\[url\\]*\n"
+        "   Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit\n"
+        "   → Downloads media + generates captions for TikTok, Reels & YouTube Shorts\n\n"
+
+        "━━━ ⚙️ SETTINGS ━━━\n"
+        "🎙 */setvoice \\[description\\]* – Save your writing style for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
-        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n"
-        "🔗 */link* – Link this Telegram to TrendPost (enables auto-post + STOP command)\n\n"
-        "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
+        "🧩 */module \\[tech|crypto|vietnam|indie\\]* – Switch focus module\n"
+        "🔗 */link* – Link Telegram to TrendPost (enables auto-post)\n\n"
+
+        "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -123,15 +128,30 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     try:
         supervisor = SupervisorAgent(_get_module())
-        report = await supervisor.generate_report()
+        report, ctx = await supervisor.generate_report_with_ctx()
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
         await msg.edit_text("❌ Could not generate report. Please try again later.")
         return
 
     await msg.delete()
-    for chunk in split_long_message(report):
-        await update.message.reply_text(chunk)
+
+    # Build inline keyboard: one Tweet button per top story
+    keyboard = None
+    if ctx and ctx.top_items:
+        buttons = [
+            InlineKeyboardButton(f"🐦 Tweet #{i}", callback_data=f"tweet:{_active_module}:{i}")
+            for i in range(1, min(len(ctx.top_items), 7) + 1)
+        ]
+        # 4 buttons per row
+        rows = [buttons[i:i+4] for i in range(0, len(buttons), 4)]
+        keyboard = InlineKeyboardMarkup(rows)
+
+    chunks = split_long_message(report)
+    for i, chunk in enumerate(chunks):
+        # Attach keyboard only to the last chunk
+        reply_markup = keyboard if (i == len(chunks) - 1) else None
+        await update.message.reply_text(chunk, reply_markup=reply_markup)
 
 
 async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -488,6 +508,126 @@ async def handle_stop_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "⚠️ Could not cancel the post. Please check TrendPost directly."
         )
+
+
+async def cmd_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/caption <url> — download video and generate viral English caption."""
+    url = " ".join(context.args).strip() if context.args else ""
+    if not url:
+        await update.message.reply_text(
+            "Usage: /caption <video_url>\n\n"
+            "Or just paste a video link directly in chat!\n\n"
+            "Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"
+        )
+        return
+    await _handle_video_url(update, url)
+
+
+async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Auto-detect video URLs pasted directly in chat (no command needed)."""
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip()
+
+    # Check if message looks like a URL (starts with http)
+    if not text.startswith("http"):
+        # Fall through to STOP handler
+        await handle_stop_message(update, context)
+        return
+
+    from modules.video.downloader import is_supported_url
+    if not is_supported_url(text):
+        # Not a video link — pass to STOP handler
+        await handle_stop_message(update, context)
+        return
+
+    await _handle_video_url(update, text)
+
+
+async def _handle_video_url(update: Update, url: str) -> None:
+    """Shared logic: download media (video or image) + generate caption + send back."""
+    from modules.video.handler import process_media_url
+    from modules.video.downloader import cleanup_video_files
+
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} command=caption url={url[:80]}")
+
+    msg = await update.message.reply_text("⬇️ Downloading media... (this may take 30-60 sec)")
+
+    result = await process_media_url(url)
+
+    if result.get("error"):
+        await msg.edit_text(f"❌ {result['error']}")
+        return
+
+    await msg.edit_text("✍️ Writing viral captions with AI...")
+
+    title = result.get("title", "")
+    caption = result.get("caption", "")
+    media_path = result.get("media_path")
+    media_type = result.get("media_type", "none")
+    thumbnail_path = result.get("thumbnail_path")
+
+    try:
+        # Send video or image
+        if media_type == "video" and media_path:
+            await update.message.reply_video(
+                video=open(media_path, "rb"),
+                caption=f"🎬 {title}" if title else None,
+            )
+        elif media_type == "image" and media_path:
+            await update.message.reply_photo(
+                photo=open(media_path, "rb"),
+                caption=f"🖼 {title}" if title else None,
+            )
+        elif thumbnail_path:
+            # Fallback: send thumbnail if no main media
+            await update.message.reply_photo(
+                photo=open(thumbnail_path, "rb"),
+                caption=f"🖼 {title}" if title else None,
+            )
+
+        # Send captions
+        await msg.delete()
+        for chunk in split_long_message(caption):
+            await update.message.reply_text(chunk)
+
+    finally:
+        cleanup_video_files(media_path, thumbnail_path)
+
+
+async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback for 🐦 Tweet #N buttons — generate tweet hook and reply as copyable code block."""
+    query = update.callback_query
+    await query.answer()  # dismiss the loading spinner
+
+    # callback_data format: "tweet:<module>:<rank>"
+    parts = query.data.split(":")
+    if len(parts) != 3 or parts[0] != "tweet":
+        return
+
+    module_name = parts[1]
+    try:
+        rank = int(parts[2])
+    except ValueError:
+        return
+
+    user_id = update.effective_user.id
+    logger.info(f"[Analytics] user={user_id} tweet_callback module={module_name} rank={rank}")
+
+    await query.message.reply_text(f"✍️ Generating tweet for story #{rank}...")
+
+    try:
+        supervisor = SupervisorAgent(load_module(module_name))
+        tweet = await supervisor.generate_tweet_hook(rank=rank)
+    except Exception as e:
+        logger.error(f"Tweet hook generation failed: {e}")
+        await query.message.reply_text("❌ Could not generate tweet. Try again.")
+        return
+
+    # Send as code block — easy to copy in Telegram
+    await query.message.reply_text(f"```\n{tweet}\n```", parse_mode="Markdown")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
