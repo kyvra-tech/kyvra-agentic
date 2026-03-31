@@ -5,6 +5,8 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN", "")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 PRODUCT_HUNT_API_KEY = os.getenv("PRODUCT_HUNT_API_KEY", "")

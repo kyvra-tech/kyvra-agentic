@@ -68,6 +68,14 @@ class BaseModule(ABC):
         """Return keywords used for relevance filtering."""
         ...
 
+    def get_tweet_hook_prompt(self, item: dict) -> str:
+        """Return the prompt to generate a single viral tweet hook for a story."""
+        return (
+            f"Write 1 compelling tweet hook (max 280 chars) about this story.\n"
+            f"Title: {item['title']}\nURL: {item['url']}\nSummary: {item['summary']}\n"
+            f"Output ONLY the tweet text, no explanation."
+        )
+
     def get_spike_thresholds(self) -> tuple[int, int]:
         """Return (github_stars_spike, x_likes_spike) thresholds for this module.
 
