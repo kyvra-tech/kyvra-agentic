@@ -4,7 +4,7 @@ Media caption handler — download video/image, generate Twitter caption via Dee
 import logging
 from pathlib import Path
 
-from modules.video.downloader import download_video, fetch_video_info, cleanup_video_files, is_supported_url
+from modules.video.downloader import download_media, cleanup_video_files, is_supported_url
 from modules.video.caption_agent import generate_twitter_caption
 from modules.video.config import MAX_VIDEO_SIZE_BYTES
 
@@ -40,17 +40,12 @@ async def process_media_url(url: str) -> dict:
     if not is_supported_url(url):
         return {"error": "Unsupported URL. Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"}
 
-    info = await fetch_video_info(url)
-    if info.error:
-        return {"error": f"Could not read media: {info.error}"}
-
-    logger.info(f"[MediaHandler] Downloading: {info.title} ({url})")
-    info = await download_video(url)
+    # Single call: inspect → download only what exists (video, image, or nothing)
+    info = await download_media(url)
 
     if info.error:
-        return {"error": f"Download failed: {info.error}"}
+        return {"error": f"Could not read URL: {info.error}"}
 
-    # Classify downloaded media
     media_path = info.video_path
     media_type = _classify_media(media_path)
 
@@ -66,7 +61,10 @@ async def process_media_url(url: str) -> dict:
             media_path = None
             media_type = "none"
 
-    logger.info(f"[MediaHandler] Generating Twitter caption for: {info.title}")
+    thumbnail_path = info.thumbnail_path
+
+    # Step 3: generate Twitter caption regardless of whether media was downloaded
+    logger.info(f"[MediaHandler] Generating Twitter caption for: {info.title or url}")
     try:
         caption = await generate_twitter_caption(
             title=info.title,
@@ -82,7 +80,7 @@ async def process_media_url(url: str) -> dict:
         "caption": caption,
         "media_path": media_path,
         "media_type": media_type,
-        "thumbnail_path": info.thumbnail_path,
+        "thumbnail_path": thumbnail_path,
         "title": info.title,
         "error": None,
     }
