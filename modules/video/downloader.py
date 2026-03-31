@@ -107,68 +107,104 @@ async def fetch_video_info(url: str) -> VideoInfo:
     return info
 
 
-async def download_video(url: str) -> VideoInfo:
-    """Download video + thumbnail + subtitles. Returns VideoInfo with local paths."""
+async def download_media(url: str) -> VideoInfo:
+    """
+    Smart download: inspect what's available first, then download only what exists.
+    - Has video  → download video + subtitles
+    - Image only → download thumbnail via httpx
+    - No media   → return metadata only (no error)
+    """
     try:
         import yt_dlp
     except ImportError:
         return VideoInfo(url=url, error="yt-dlp not installed. Run: pip install yt-dlp")
 
-    info = VideoInfo(url=url)
     download_dir = _ensure_download_dir()
 
+    # Step 1: extract info without downloading
+    info = VideoInfo(url=url)
     try:
-        opts = {
-            **YTDLP_VIDEO_OPTS,
-            "outtmpl": str(download_dir / "%(id)s.%(ext)s"),
-            "writethumbnail": True,
-        }
+        def _get_info():
+            with yt_dlp.YoutubeDL({**YTDLP_INFO_OPTS}) as ydl:
+                return ydl.extract_info(url, download=False)
 
-        downloaded_path: dict = {}
-
-        def _progress_hook(d: dict) -> None:
-            if d["status"] == "finished":
-                downloaded_path["video"] = d.get("filename", "")
-
-        opts["progress_hooks"] = [_progress_hook]
-
-        def _run():
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                return ydl.extract_info(url, download=True)
-
-        data = await asyncio.to_thread(_run)
-
+        data = await asyncio.to_thread(_get_info)
         info.title = data.get("title", "")
         info.description = (data.get("description") or "")[:1000]
         info.thumbnail_url = data.get("thumbnail", "")
         info.duration = data.get("duration", 0) or 0
-        video_id = data.get("id", "")
+        video_id = data.get("id", "unknown")
 
-        # Find downloaded video file
-        video_file = downloaded_path.get("video", "")
-        if not video_file or not Path(video_file).exists():
-            # Fallback: search by video_id
-            for f in download_dir.iterdir():
-                if f.stem == video_id and f.suffix in (".mp4", ".webm", ".mkv"):
-                    video_file = str(f)
-                    break
-
-        if video_file and Path(video_file).exists():
-            info.video_path = video_file
-
-        # Find thumbnail
-        for ext in ["jpg", "jpeg", "png", "webp"]:
-            thumb = download_dir / f"{video_id}.{ext}"
-            if thumb.exists():
-                info.thumbnail_path = str(thumb)
-                break
-
-        # Extract transcript from subtitle files
-        info.transcript = _extract_transcript_from_subs(video_id, download_dir)
-
+        # Determine if there is a real video stream
+        formats = data.get("formats") or []
+        has_video = any(
+            f.get("vcodec", "none") != "none" and f.get("vcodec") is not None
+            for f in formats
+        )
     except Exception as e:
         info.error = str(e)
-        logger.error(f"[VideoDownload] Failed for {url}: {e}")
+        logger.error(f"[Download] Info extraction failed for {url}: {e}")
+        return info
+
+    # Step 2a: has video → download it
+    if has_video:
+        logger.info(f"[Download] Video found, downloading: {info.title}")
+        try:
+            opts = {
+                **YTDLP_VIDEO_OPTS,
+                "outtmpl": str(download_dir / "%(id)s.%(ext)s"),
+                "writethumbnail": False,
+            }
+            downloaded_path: dict = {}
+
+            def _progress_hook(d: dict) -> None:
+                if d["status"] == "finished":
+                    downloaded_path["video"] = d.get("filename", "")
+
+            opts["progress_hooks"] = [_progress_hook]
+
+            def _download():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.extract_info(url, download=True)
+
+            await asyncio.to_thread(_download)
+
+            video_file = downloaded_path.get("video", "")
+            if not video_file or not Path(video_file).exists():
+                for f in download_dir.iterdir():
+                    if f.stem == video_id and f.suffix in (".mp4", ".webm", ".mkv"):
+                        video_file = str(f)
+                        break
+
+            if video_file and Path(video_file).exists():
+                info.video_path = video_file
+
+            info.transcript = _extract_transcript_from_subs(video_id, download_dir)
+
+        except Exception as e:
+            logger.warning(f"[Download] Video download failed: {e}")
+
+    # Step 2b: no video but has thumbnail → download image via httpx
+    elif info.thumbnail_url:
+        logger.info(f"[Download] No video, downloading thumbnail image: {info.thumbnail_url}")
+        ext = info.thumbnail_url.split("?")[0].rsplit(".", 1)[-1].lower()
+        if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
+            ext = "jpg"
+        dest = download_dir / f"{video_id}_thumb.{ext}"
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                resp = await client.get(info.thumbnail_url)
+                resp.raise_for_status()
+                dest.write_bytes(resp.content)
+            info.thumbnail_path = str(dest)
+            logger.info(f"[Download] Thumbnail saved: {dest}")
+        except Exception as e:
+            logger.warning(f"[Download] Thumbnail download failed: {e}")
+
+    # Step 2c: no media at all → caption-only, no error
+    else:
+        logger.info(f"[Download] No media found for {url} — caption-only mode")
 
     return info
 

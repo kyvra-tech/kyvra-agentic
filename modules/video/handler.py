@@ -4,7 +4,7 @@ Media caption handler — download video/image, generate Twitter caption via Dee
 import logging
 from pathlib import Path
 
-from modules.video.downloader import download_video, fetch_video_info, cleanup_video_files, is_supported_url
+from modules.video.downloader import download_media, cleanup_video_files, is_supported_url
 from modules.video.caption_agent import generate_twitter_caption
 from modules.video.config import MAX_VIDEO_SIZE_BYTES
 
@@ -40,42 +40,28 @@ async def process_media_url(url: str) -> dict:
     if not is_supported_url(url):
         return {"error": "Unsupported URL. Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"}
 
-    # Step 1: fetch metadata (fast, no download)
-    info = await fetch_video_info(url)
+    # Single call: inspect → download only what exists (video, image, or nothing)
+    info = await download_media(url)
+
     if info.error:
-        # Metadata fetch failed — still try to generate caption from URL alone
-        logger.warning(f"[MediaHandler] Could not fetch metadata: {info.error}")
+        return {"error": f"Could not read URL: {info.error}"}
 
-    # Step 2: try to download media (best-effort, skip on failure)
-    media_path = None
-    media_type = "none"
-    thumbnail_path = None
+    media_path = info.video_path
+    media_type = _classify_media(media_path)
 
-    if not info.error:
-        logger.info(f"[MediaHandler] Downloading: {info.title} ({url})")
-        downloaded = await download_video(url)
+    if media_type == "none" and info.thumbnail_path:
+        media_path = info.thumbnail_path
+        media_type = "image"
+        info.thumbnail_path = None
 
-        if downloaded.error:
-            logger.warning(f"[MediaHandler] Download failed (caption-only mode): {downloaded.error}")
-            # Keep metadata from fetch_video_info, skip media files
-        else:
-            info = downloaded
-            media_path = info.video_path
-            media_type = _classify_media(media_path)
+    if media_type == "video" and media_path:
+        size = Path(media_path).stat().st_size
+        if size > MAX_VIDEO_SIZE_BYTES:
+            logger.warning(f"[MediaHandler] Video too large ({size / 1e6:.1f} MB), skipping send")
+            media_path = None
+            media_type = "none"
 
-            if media_type == "none" and info.thumbnail_path:
-                media_path = info.thumbnail_path
-                media_type = "image"
-                info.thumbnail_path = None
-
-            if media_type == "video" and media_path:
-                size = Path(media_path).stat().st_size
-                if size > MAX_VIDEO_SIZE_BYTES:
-                    logger.warning(f"[MediaHandler] Video too large ({size / 1e6:.1f} MB), skipping send")
-                    media_path = None
-                    media_type = "none"
-
-            thumbnail_path = info.thumbnail_path
+    thumbnail_path = info.thumbnail_path
 
     # Step 3: generate Twitter caption regardless of whether media was downloaded
     logger.info(f"[MediaHandler] Generating Twitter caption for: {info.title or url}")
