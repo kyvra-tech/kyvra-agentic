@@ -1,23 +1,20 @@
 """
-Media caption handler — handles video and image URLs.
-Decoupled from Telegram so it can be tested independently.
+Media caption handler — download video/image, generate Twitter caption via DeepSeek.
 """
 import logging
 from pathlib import Path
 
 from modules.video.downloader import download_video, fetch_video_info, cleanup_video_files, is_supported_url
-from modules.video.caption_agent import generate_all_captions
+from modules.video.caption_agent import generate_twitter_caption
 from modules.video.config import MAX_VIDEO_SIZE_BYTES
 
 logger = logging.getLogger(__name__)
 
-# Image extensions that yt-dlp may download for image posts
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".mov", ".avi"}
 
 
 def _classify_media(path: str | None) -> str:
-    """Return 'video', 'image', or 'none'."""
     if not path:
         return "none"
     suffix = Path(path).suffix.lower()
@@ -30,57 +27,52 @@ def _classify_media(path: str | None) -> str:
 
 async def process_media_url(url: str) -> dict:
     """
-    Full pipeline: download → caption.
-    Handles both video and image posts (Instagram, Twitter/X, TikTok, etc.)
+    Download media → generate Twitter caption.
 
     Returns dict with keys:
-      - caption: str
-      - media_path: str | None        (main media file: video or image)
+      - caption: str          (ready-to-copy tweet)
+      - media_path: str | None
       - media_type: 'video'|'image'|'none'
-      - thumbnail_path: str | None    (thumbnail for videos)
+      - thumbnail_path: str | None
       - title: str
       - error: str | None
     """
     if not is_supported_url(url):
         return {"error": "Unsupported URL. Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"}
 
-    # Step 1: fetch info (fast, no download) to get title/description
     info = await fetch_video_info(url)
     if info.error:
         return {"error": f"Could not read media: {info.error}"}
 
-    # Step 2: download media + thumbnail + subtitles
     logger.info(f"[MediaHandler] Downloading: {info.title} ({url})")
     info = await download_video(url)
 
     if info.error:
         return {"error": f"Download failed: {info.error}"}
 
-    # Step 3: classify what was downloaded
+    # Classify downloaded media
     media_path = info.video_path
     media_type = _classify_media(media_path)
 
-    # If no video found, check if thumbnail is an image post (e.g. Instagram photo)
     if media_type == "none" and info.thumbnail_path:
         media_path = info.thumbnail_path
         media_type = "image"
-        info.thumbnail_path = None  # don't double-send
+        info.thumbnail_path = None
 
-    # Step 4: check file size for videos
     if media_type == "video" and media_path:
         size = Path(media_path).stat().st_size
         if size > MAX_VIDEO_SIZE_BYTES:
-            logger.warning(f"[MediaHandler] Video too large ({size / 1e6:.1f} MB), will skip video send")
+            logger.warning(f"[MediaHandler] Video too large ({size / 1e6:.1f} MB), skipping send")
             media_path = None
             media_type = "none"
 
-    # Step 5: generate caption with DeepSeek
-    logger.info(f"[MediaHandler] Generating captions for: {info.title}")
+    logger.info(f"[MediaHandler] Generating Twitter caption for: {info.title}")
     try:
-        caption = await generate_all_captions(
+        caption = await generate_twitter_caption(
             title=info.title,
             description=info.description,
             transcript=info.transcript,
+            url=url,
         )
     except Exception as e:
         logger.error(f"[MediaHandler] Caption generation failed: {e}")
