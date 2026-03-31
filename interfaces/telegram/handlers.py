@@ -71,50 +71,55 @@ async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "👋 Hey! I'm *Kyvra* – your AI content agent for Tech, AI & Crypto.\n\n"
-        "I monitor X/Twitter, GitHub Trending, top blogs and crypto media, "
-        "then distill it into a daily briefing with content angles every morning at 8 AM.\n\n"
-        "*Commands:*\n"
-        "/update – Fast news scan right now (no AI, ~10 sec)\n"
-        "/breaking – Spike alerts only\n"
-        "/topic [kw] – Report scoped to one topic\n"
-        "/report – Full AI-written daily report\n"
-        "/brief – 3-bullet summary, ready to share\n"
-        "/thread – 7-tweet thread from today's top story\n"
-        "/newsletter – Newsletter section from today's top story\n"
-        "/script – TikTok/Reels voiceover script\n"
-        "/status – Source health & item count check\n"
-        "/chat [msg] – Chat about today's news\n"
-        "/setvoice [description] – Set your writing style/voice\n"
-        "/module [tech|crypto|vietnam|indie] – Switch focus module\n"
-        "/link – Link this Telegram to your TrendPost account (enables auto-post)\n\n"
-        "Try `/update` for a quick check! ⚡"
+        "👋 Hey\\! I'm *Kyvra* – your AI content agent for Tech, AI & Crypto\\.\n\n"
+        "I monitor GitHub Trending, Reddit, RSS feeds and more, "
+        "then distill it into a daily briefing with content angles every morning at 8 AM\\.\n\n"
+        "*Quick start:*\n"
+        "⚡ `/update` – Fast news scan \\(~10 sec\\)\n"
+        "📋 `/report` – Full AI report \\+ tweet buttons\n"
+        "🎥 Paste a video link – get viral captions instantly\n\n"
+        "Type /help to see all features\\."
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="MarkdownV2")
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n\n"
-        "⚡ */update* – Fast scan, top scored items, no AI writing (~10 sec)\n"
-        "🚨 */breaking* – Spike items only (viral X tweets, trending signals)\n"
-        "🔍 */topic [keyword]* – AI report scoped to one topic\n"
-        "   e.g. `/topic openai` `/topic bitcoin` `/topic defi`\n"
-        "📋 */report* – Full daily report with content angles (30-60 sec)\n"
+        f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n"
+        f"Powered by Ollama (Gemma 3) + DeepSeek\n\n"
+
+        "━━━ 📡 NEWS & INTEL ━━━\n"
+        "⚡ */update* – Fast scan of latest news, no AI writing (~10 sec)\n"
+        "🚨 */breaking* – Spike alerts only — viral or trending signals\n"
+        "🔍 */topic \\[keyword\\]* – AI report scoped to one topic\n"
+        "   e.g. `/topic openai` `/topic bitcoin`\n"
+        "📋 */report* – Full AI daily report with content angles (30-60 sec)\n"
+        "   _Each story has a_ 🐦 _Tweet button — tap to copy a viral tweet hook_\n"
+        "📊 */status* – Source health: items fetched, top score, spikes\n\n"
+
+        "━━━ ✍️ CONTENT CREATION ━━━\n"
         "⚡ */brief* – 3-bullet summary, screenshot-ready\n"
         "🧵 */thread* – 7-tweet X thread from today's top story\n"
         "📰 */newsletter* – Newsletter section from today's top story\n"
-        "🎬 */script* – TikTok/Reels voiceover script from today's top story\n"
-        "📊 */status* – Source health check: items fetched, top score, spikes\n"
-        "💬 */chat [question]* – Chat about today's news\n"
-        "   e.g. `/chat What's new with OpenAI today?`\n"
-        "🎙 */setvoice [description]* – Set your writing voice for all content\n"
+        "🎬 */script* – TikTok/Reels voiceover script (60-90 sec)\n"
+        "💬 */chat \\[question\\]* – Chat about today's news\n"
+        "   e.g. `/chat What's the biggest AI story today?`\n\n"
+
+        "━━━ 🎥 VIDEO / IMAGE CAPTION ━━━\n"
+        "🔗 *Paste any video/image link* directly in chat\n"
+        "   _or use_ */caption \\[url\\]*\n"
+        "   Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit\n"
+        "   → Downloads media + generates captions for TikTok, Reels & YouTube Shorts\n\n"
+
+        "━━━ ⚙️ SETTINGS ━━━\n"
+        "🎙 */setvoice \\[description\\]* – Save your writing style for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
-        "🧩 */module [tech|crypto|vietnam|indie]* – Switch active module\n"
-        "🔗 */link* – Link this Telegram to TrendPost (enables auto-post + STOP command)\n\n"
-        "📅 Auto-report every day at *8:00 AM* and *8:00 PM* (GMT+7)"
+        "🧩 */module \\[tech|crypto|vietnam|indie\\]* – Switch focus module\n"
+        "🔗 */link* – Link Telegram to TrendPost (enables auto-post)\n\n"
+
+        "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

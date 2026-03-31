@@ -2,7 +2,7 @@ import sys
 import logging
 import asyncio
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from config import TELEGRAM_BOT_TOKEN, XAI_API_KEY, ACTIVE_MODULE
+from config import TELEGRAM_BOT_TOKEN, ACTIVE_MODULE
 from agents.supervisor import load_module
 from interfaces.telegram.handlers import (
     cmd_start, cmd_help, cmd_report, cmd_chat, error_handler,
@@ -23,8 +23,6 @@ logger = logging.getLogger(__name__)
 def validate_config() -> None:
     if not TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in .env")
-    if not XAI_API_KEY:
-        raise RuntimeError("XAI_API_KEY is not set in .env")
 
 
 def main() -> None:
