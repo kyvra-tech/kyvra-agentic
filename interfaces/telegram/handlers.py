@@ -547,14 +547,13 @@ async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def _handle_video_url(update: Update, url: str) -> None:
-    """Shared logic: download media (video or image) + generate caption + send back."""
+    """Fetch media metadata, generate captions via Ollama, reply with link + captions."""
     from modules.video.handler import process_media_url
-    from modules.video.downloader import cleanup_video_files
 
     user_id = update.effective_user.id
     logger.info(f"[Analytics] user={user_id} command=caption url={url[:80]}")
 
-    msg = await update.message.reply_text("⬇️ Downloading media... (this may take 30-60 sec)")
+    msg = await update.message.reply_text("✍️ Reading media and writing captions...")
 
     result = await process_media_url(url)
 
@@ -562,40 +561,15 @@ async def _handle_video_url(update: Update, url: str) -> None:
         await msg.edit_text(f"❌ {result['error']}")
         return
 
-    await msg.edit_text("✍️ Writing viral captions with AI...")
-
     title = result.get("title", "")
     caption = result.get("caption", "")
-    media_path = result.get("media_path")
-    media_type = result.get("media_type", "none")
-    thumbnail_path = result.get("thumbnail_path")
 
-    try:
-        # Send video or image
-        if media_type == "video" and media_path:
-            await update.message.reply_video(
-                video=open(media_path, "rb"),
-                caption=f"🎬 {title}" if title else None,
-            )
-        elif media_type == "image" and media_path:
-            await update.message.reply_photo(
-                photo=open(media_path, "rb"),
-                caption=f"🖼 {title}" if title else None,
-            )
-        elif thumbnail_path:
-            # Fallback: send thumbnail if no main media
-            await update.message.reply_photo(
-                photo=open(thumbnail_path, "rb"),
-                caption=f"🖼 {title}" if title else None,
-            )
+    header = f"🔗 [{title}]({url})\n\n" if title else f"🔗 {url}\n\n"
 
-        # Send captions
-        await msg.delete()
-        for chunk in split_long_message(caption):
-            await update.message.reply_text(chunk)
-
-    finally:
-        cleanup_video_files(media_path, thumbnail_path)
+    await msg.delete()
+    chunks = split_long_message(header + caption)
+    for chunk in chunks:
+        await update.message.reply_text(chunk, disable_web_page_preview=False)
 
 
 async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
