@@ -290,12 +290,20 @@ def load_module(module_name: str) -> BaseModule:
     from modules.crypto.sources import CryptoModule
     from modules.vietnam.sources import VietnamModule
     from modules.indie.sources import IndieModule
+    from modules.parody.sources import ParodyModule
+    from modules.sport.sources import SportModule
+    from modules.political.sources import PoliticalModule
+    from modules.war.sources import WarModule
 
     registry: dict[str, type[BaseModule]] = {
-        "tech":    TechModule,
-        "crypto":  CryptoModule,
-        "vietnam": VietnamModule,
-        "indie":   IndieModule,
+        "tech":      TechModule,
+        "crypto":    CryptoModule,
+        "vietnam":   VietnamModule,
+        "indie":     IndieModule,
+        "parody":    ParodyModule,
+        "sport":     SportModule,
+        "political": PoliticalModule,
+        "war":       WarModule,
     }
     cls = registry.get(module_name)
     if cls is None:
