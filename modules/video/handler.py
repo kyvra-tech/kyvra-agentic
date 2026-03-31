@@ -1,39 +1,78 @@
 """
-Media caption handler — fetch metadata only (no download), generate caption via Ollama.
+Media caption handler — download video/image, generate Twitter caption via DeepSeek.
 """
 import logging
+from pathlib import Path
 
-from modules.video.downloader import fetch_video_info, is_supported_url
-from modules.video.caption_agent import generate_all_captions
+from modules.video.downloader import download_video, fetch_video_info, cleanup_video_files, is_supported_url
+from modules.video.caption_agent import generate_twitter_caption
+from modules.video.config import MAX_VIDEO_SIZE_BYTES
 
 logger = logging.getLogger(__name__)
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".mov", ".avi"}
+
+
+def _classify_media(path: str | None) -> str:
+    if not path:
+        return "none"
+    suffix = Path(path).suffix.lower()
+    if suffix in VIDEO_EXTENSIONS:
+        return "video"
+    if suffix in IMAGE_EXTENSIONS:
+        return "image"
+    return "none"
 
 
 async def process_media_url(url: str) -> dict:
     """
-    Lightweight pipeline: fetch metadata → generate captions via Ollama.
-    No download, no local files.
+    Download media → generate Twitter caption.
 
     Returns dict with keys:
-      - caption: str
+      - caption: str          (ready-to-copy tweet)
+      - media_path: str | None
+      - media_type: 'video'|'image'|'none'
+      - thumbnail_path: str | None
       - title: str
-      - url: str
       - error: str | None
     """
     if not is_supported_url(url):
         return {"error": "Unsupported URL. Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"}
 
-    # Fetch title + description only (no download)
     info = await fetch_video_info(url)
     if info.error:
-        return {"error": f"Could not read media info: {info.error}"}
+        return {"error": f"Could not read media: {info.error}"}
 
-    logger.info(f"[MediaHandler] Generating captions for: {info.title}")
+    logger.info(f"[MediaHandler] Downloading: {info.title} ({url})")
+    info = await download_video(url)
+
+    if info.error:
+        return {"error": f"Download failed: {info.error}"}
+
+    # Classify downloaded media
+    media_path = info.video_path
+    media_type = _classify_media(media_path)
+
+    if media_type == "none" and info.thumbnail_path:
+        media_path = info.thumbnail_path
+        media_type = "image"
+        info.thumbnail_path = None
+
+    if media_type == "video" and media_path:
+        size = Path(media_path).stat().st_size
+        if size > MAX_VIDEO_SIZE_BYTES:
+            logger.warning(f"[MediaHandler] Video too large ({size / 1e6:.1f} MB), skipping send")
+            media_path = None
+            media_type = "none"
+
+    logger.info(f"[MediaHandler] Generating Twitter caption for: {info.title}")
     try:
-        caption = await generate_all_captions(
+        caption = await generate_twitter_caption(
             title=info.title,
             description=info.description,
-            transcript="",
+            transcript=info.transcript,
+            url=url,
         )
     except Exception as e:
         logger.error(f"[MediaHandler] Caption generation failed: {e}")
@@ -41,7 +80,9 @@ async def process_media_url(url: str) -> dict:
 
     return {
         "caption": caption,
+        "media_path": media_path,
+        "media_type": media_type,
+        "thumbnail_path": info.thumbnail_path,
         "title": info.title,
-        "url": url,
         "error": None,
     }
