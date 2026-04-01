@@ -516,9 +516,9 @@ async def cmd_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     url = " ".join(context.args).strip() if context.args else ""
     if not url:
         await update.message.reply_text(
-            "Usage: /caption <video_url>\n\n"
-            "Or just paste a video link directly in chat!\n\n"
-            "Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"
+            "Usage: /caption <url>\n\n"
+            "Or just paste any link directly in chat!\n\n"
+            "Works with any URL — YouTube, TikTok, Instagram, articles, tweets, etc."
         )
         return
     await _handle_video_url(update, url)
@@ -534,12 +534,6 @@ async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Check if message looks like a URL (starts with http)
     if not text.startswith("http"):
         # Fall through to STOP handler
-        await handle_stop_message(update, context)
-        return
-
-    from modules.video.downloader import is_supported_url
-    if not is_supported_url(text):
-        # Not a video link — pass to STOP handler
         await handle_stop_message(update, context)
         return
 
