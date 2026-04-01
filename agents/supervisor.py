@@ -288,22 +288,24 @@ async def generate_report_for_module_with_ctx(module_name: str):
 def load_module(module_name: str) -> BaseModule:
     from modules.tech.sources import TechModule
     from modules.crypto.sources import CryptoModule
-    from modules.vietnam.sources import VietnamModule
-    from modules.indie.sources import IndieModule
     from modules.parody.sources import ParodyModule
     from modules.sport.sources import SportModule
     from modules.political.sources import PoliticalModule
     from modules.war.sources import WarModule
+    from modules.humor.sources import HumorModule
+    from modules.energy.sources import EnergyModule
+    from modules.markets.sources import MarketsModule
 
     registry: dict[str, type[BaseModule]] = {
         "tech":      TechModule,
         "crypto":    CryptoModule,
-        "vietnam":   VietnamModule,
-        "indie":     IndieModule,
         "parody":    ParodyModule,
         "sport":     SportModule,
         "political": PoliticalModule,
         "war":       WarModule,
+        "humor":     HumorModule,
+        "energy":    EnergyModule,
+        "markets":   MarketsModule,
     }
     cls = registry.get(module_name)
     if cls is None:

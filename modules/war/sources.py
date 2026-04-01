@@ -8,62 +8,73 @@ class WarModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
+            # ── Tier 1: conflict-specialist outlets ───────────────────────
             DataSource(
                 name="Kyiv Independent",
                 url="https://kyivindependent.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Kyiv Independent"],
+                authority_score=SOURCE_AUTHORITY.get("Kyiv Independent", 18),
                 bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Middle East Eye",
+                url="https://www.middleeasteye.net/rss",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Middle East Eye", 16),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Defense News",
+                url="https://www.defensenews.com/arc/outboundfeeds/rss/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Defense News", 16),
+                bypass_keyword_filter=True,
+            ),
+            # ── Tier 2: wire services / international ─────────────────────
+            DataSource(
+                name="Reuters World",
+                url="https://feeds.reuters.com/reuters/worldNews",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reuters", 20),
+            ),
+            DataSource(
+                name="BBC World",
+                url="https://feeds.bbci.co.uk/news/world/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("BBC News", 19),
             ),
             DataSource(
                 name="Al Jazeera",
                 url="https://www.aljazeera.com/xml/rss/all.xml",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Al Jazeera"],
+                authority_score=SOURCE_AUTHORITY.get("Al Jazeera", 17),
             ),
             DataSource(
-                name="Reuters",
-                url="https://feeds.reuters.com/reuters/worldNews",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reuters"],
-            ),
-            DataSource(
-                name="BBC News",
-                url="https://feeds.bbci.co.uk/news/world/rss.xml",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["BBC News"],
-            ),
-            DataSource(
-                name="AP News",
+                name="AP News World",
                 url="https://rsshub.app/apnews/topics/war-and-conflicts",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["AP News"],
+                authority_score=SOURCE_AUTHORITY.get("AP News", 19),
             ),
+            # ── Tier 3: NewsAPI conflict keyword search ───────────────────
             DataSource(
-                name="The Guardian",
-                url="https://www.theguardian.com/world/rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["The Guardian"],
-            ),
-            DataSource(
-                name="Reddit - Ukraine",
-                url="https://www.reddit.com/r/ukraine/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Ukraine"],
-            ),
-            DataSource(
-                name="Reddit - WorldNews",
-                url="https://www.reddit.com/r/worldnews/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - WorldNews"],
+                name="NewsAPI - War",
+                url="https://newsapi.org/v2/everything",
+                source_type="newsapi",
+                params={
+                    "endpoint": "everything",
+                    "q": "war OR conflict OR military OR ceasefire OR missile OR NATO",
+                    "sort_by": "publishedAt",
+                    "page_size": 15,
+                },
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - War", 14),
+                bypass_keyword_filter=True,
             ),
         ]
 
@@ -92,4 +103,4 @@ class WarModule(BaseModule):
         return KEYWORDS
 
     def get_spike_thresholds(self) -> tuple[int, int]:
-        return (30, 200)  # lower thresholds — war news spikes fast
+        return (30, 200)

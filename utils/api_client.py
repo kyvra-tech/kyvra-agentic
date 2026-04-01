@@ -145,6 +145,63 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
         return []
 
 
+async def fetch_newsapi(source: DataSource) -> list[RawItem]:
+    from config import NEWS_API_KEY
+    if not NEWS_API_KEY:
+        logger.warning(f"NEWS_API_KEY not set, skipping {source.name}")
+        return []
+
+    cache_key = f"newsapi:{source.name}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        params = {
+            "apiKey": NEWS_API_KEY,
+            "language": source.params.get("language", "en"),
+            "pageSize": source.params.get("page_size", 20),
+            "sortBy": source.params.get("sort_by", "publishedAt"),
+        }
+        # Support both /top-headlines (category/q) and /everything (q)
+        endpoint = source.params.get("endpoint", "top-headlines")
+        if endpoint == "top-headlines":
+            if "category" in source.params:
+                params["category"] = source.params["category"]
+            if "q" in source.params:
+                params["q"] = source.params["q"]
+        else:
+            params["q"] = source.params.get("q", "")
+
+        url = f"https://newsapi.org/v2/{endpoint}"
+        async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        items = []
+        for article in data.get("articles", []):
+            title = article.get("title") or ""
+            url_link = article.get("url") or ""
+            if not title or not url_link or title == "[Removed]":
+                continue
+            items.append(RawItem(
+                title=title,
+                url=url_link,
+                source=source.name,
+                published_at=article.get("publishedAt", ""),
+                summary=(article.get("description") or "")[:500],
+                authority_score=source.authority_score,
+            ))
+
+        cache.set(cache_key, items)
+        logger.info(f"[NewsAPI] {source.name}: fetched {len(items)} articles")
+        return items
+    except Exception as e:
+        logger.warning(f"NewsAPI fetch failed for {source.name}: {e}")
+        return []
+
+
 async def fetch_source(source: DataSource) -> list[RawItem]:
     if source.source_type == "rss":
         return await fetch_rss(source)
@@ -152,6 +209,8 @@ async def fetch_source(source: DataSource) -> list[RawItem]:
         return await fetch_github_trending(source)
     elif source.source_type == "x":
         return await fetch_x_search(source)
+    elif source.source_type == "newsapi":
+        return await fetch_newsapi(source)
     else:
         logger.warning(f"No fetcher for source: {source.name} ({source.source_type})")
         return []

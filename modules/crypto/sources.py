@@ -1,39 +1,6 @@
 from modules.base import BaseModule, DataSource
-from modules.crypto.config import (
-    KEYWORDS, SOURCE_AUTHORITY,
-    X_CRYPTO_GLOBAL_LEADERS, X_BITCOIN_MACRO,
-    X_ETHEREUM_DEFI, X_SOLANA_ALT_L1,
-    X_CRYPTO_MACRO_ACCOUNTS, X_VIETNAM_CRYPTO,
-)
+from modules.crypto.config import KEYWORDS, SOURCE_AUTHORITY
 from modules.crypto import prompts
-
-# Build from: account queries — English global feeds
-_X_GLOBAL_LEADERS_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_CRYPTO_GLOBAL_LEADERS)
-    + " -is:retweet lang:en"
-)
-_X_BTC_MACRO_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_BITCOIN_MACRO)
-    + " -is:retweet lang:en"
-)
-_X_ETH_DEFI_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_ETHEREUM_DEFI)
-    + " -is:retweet lang:en"
-)
-_X_SOL_L1_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_SOLANA_ALT_L1)
-    + " -is:retweet lang:en"
-)
-_X_MACRO_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_CRYPTO_MACRO_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
-
-# Vietnam: include both English and Vietnamese tweets from known accounts
-_X_VIETNAM_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_VIETNAM_CRYPTO)
-    + " -is:retweet"
-)
 
 
 class CryptoModule(BaseModule):
@@ -41,78 +8,67 @@ class CryptoModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── X: account-based, primary signal ──────────────────────────
-            # These are pre-curated trusted accounts — bypass keyword filter
+            # ── Tier 1: crypto-native publications ────────────────────────
             DataSource(
-                name="X - Crypto Global Leaders",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_GLOBAL_LEADERS_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Crypto Global Leaders"],
+                name="CoinDesk",
+                url="https://www.coindesk.com/arc/outboundfeeds/rss/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("CoinDesk", 18),
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="X - Bitcoin & Macro",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_BTC_MACRO_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Bitcoin & Macro"],
+                name="CoinTelegraph",
+                url="https://cointelegraph.com/rss",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("CoinTelegraph", 17),
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="X - Ethereum & DeFi",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_ETH_DEFI_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Ethereum & DeFi"],
+                name="Decrypt",
+                url="https://decrypt.co/feed",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Decrypt", 16),
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="X - Solana & Alt-L1",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_SOL_L1_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Solana & Alt-L1"],
+                name="The Block",
+                url="https://www.theblock.co/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("The Block", 17),
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="X - Crypto Macro",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_MACRO_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Crypto Macro"],
+                name="Blockworks",
+                url="https://blockworks.co/feed",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Blockworks", 16),
                 bypass_keyword_filter=True,
             ),
-            # ── X: Vietnam crypto community ────────────────────────────────
+            # ── Tier 2: broader finance with crypto coverage ───────────────
             DataSource(
-                name="X - Vietnam Crypto",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_VIETNAM_QUERY, "max_results": 10},
-                authority_score=SOURCE_AUTHORITY["X - Vietnam Crypto"],
-                bypass_keyword_filter=True,
+                name="Reuters Crypto",
+                url="https://feeds.reuters.com/reuters/businessNews",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reuters Crypto", 18),
             ),
-            # ── X: keyword-based signal discovery ─────────────────────────
+            # ── Tier 3: NewsAPI crypto keyword search ─────────────────────
             DataSource(
-                name="X - DeFi",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
+                name="NewsAPI - Crypto",
+                url="https://newsapi.org/v2/everything",
+                source_type="newsapi",
                 params={
-                    "query": "(DeFi OR TVL OR liquidity OR yield farming OR airdrop) -is:retweet lang:en",
-                    "max_results": 10,
+                    "endpoint": "everything",
+                    "q": "bitcoin OR ethereum OR crypto OR DeFi OR blockchain",
+                    "sort_by": "publishedAt",
+                    "page_size": 15,
                 },
-                authority_score=SOURCE_AUTHORITY["X - DeFi"],
-                bypass_keyword_filter=True,
-            ),
-            DataSource(
-                name="X - Web3 / L2",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={
-                    "query": "(L2 OR rollup OR \"zk proof\" OR \"smart contract\" OR web3) -is:retweet lang:en",
-                    "max_results": 10,
-                },
-                authority_score=SOURCE_AUTHORITY["X - Web3 / L2"],
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Crypto", 14),
                 bypass_keyword_filter=True,
             ),
         ]
