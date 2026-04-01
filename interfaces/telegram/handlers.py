@@ -137,15 +137,15 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     await msg.delete()
 
-    # Build inline keyboard: one Tweet button per top story
+    # Build inline keyboard: EN + JA tweet buttons per top story
     keyboard = None
     if ctx and ctx.top_items:
-        buttons = [
-            InlineKeyboardButton(f"🐦 Tweet #{i}", callback_data=f"tweet:{_active_module}:{i}")
-            for i in range(1, min(len(ctx.top_items), 7) + 1)
-        ]
-        # 4 buttons per row
-        rows = [buttons[i:i+4] for i in range(0, len(buttons), 4)]
+        rows = []
+        for i in range(1, min(len(ctx.top_items), 7) + 1):
+            rows.append([
+                InlineKeyboardButton(f"🐦 EN #{i}", callback_data=f"tweet:{_active_module}:{i}:en"),
+                InlineKeyboardButton(f"🇯🇵 JA #{i}", callback_data=f"tweet:{_active_module}:{i}:ja"),
+            ])
         keyboard = InlineKeyboardMarkup(rows)
 
     chunks = split_long_message(report)
@@ -596,32 +596,34 @@ async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()  # dismiss the loading spinner
 
-    # callback_data format: "tweet:<module>:<rank>"
+    # callback_data format: "tweet:<module>:<rank>:<lang>"
     parts = query.data.split(":")
-    if len(parts) != 3 or parts[0] != "tweet":
+    if len(parts) != 4 or parts[0] != "tweet":
         return
 
     module_name = parts[1]
+    lang = parts[3]  # "en" or "ja"
     try:
         rank = int(parts[2])
     except ValueError:
         return
 
     user_id = update.effective_user.id
-    logger.info(f"[Analytics] user={user_id} tweet_callback module={module_name} rank={rank}")
+    lang_label = "🇯🇵 Japanese" if lang == "ja" else "🐦 English"
+    logger.info(f"[Analytics] user={user_id} tweet_callback module={module_name} rank={rank} lang={lang}")
 
-    await query.message.reply_text(f"✍️ Generating tweet for story #{rank}...")
+    await query.message.reply_text(f"✍️ Generating {lang_label} tweet for story #{rank}...")
 
     try:
         supervisor = SupervisorAgent(load_module(module_name))
-        tweet = await supervisor.generate_tweet_hook(rank=rank)
+        tweet = await supervisor.generate_tweet_hook(rank=rank, lang=lang)
     except Exception as e:
         logger.error(f"Tweet hook generation failed: {e}")
         await query.message.reply_text("❌ Could not generate tweet. Try again.")
         return
 
-    # Send as code block — easy to copy in Telegram
-    await query.message.reply_text(f"```\n{tweet}\n```", parse_mode="Markdown")
+    flag = "🇯🇵" if lang == "ja" else "🐦"
+    await query.message.reply_text(f"{flag}\n```\n{tweet}\n```", parse_mode="Markdown")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -154,7 +154,7 @@ Write a 60-second deadpan satirical voiceover script:
 Rules: 150-180 words total. Speak like a news anchor reading insane news."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are a viral satirical Twitter writer in the style of The Onion.
 
 Story:
@@ -166,5 +166,7 @@ Write exactly 1 tweet (max 280 chars) that:
 - Reports the story completely deadpan, as if it's totally normal
 - Makes it sound absurd by being too straight-faced
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""

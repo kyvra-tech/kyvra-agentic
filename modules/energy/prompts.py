@@ -155,7 +155,7 @@ Write a 60-second energy news voiceover script:
 Rules: 150-180 words. Data-first. Include at least 2 specific numbers."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are an energy markets Twitter analyst.
 
 Story:
@@ -168,5 +168,7 @@ Write exactly 1 tweet (max 280 chars) that:
 - Includes a specific number or asset if available
 - Uses $TICKER format for energy stocks/ETFs where relevant
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""

@@ -117,8 +117,8 @@ class TechModule(BaseModule):
     def get_script_prompt(self, item: dict, voice: str | None = None) -> str:
         return prompts.build_script_prompt(item, voice=voice)
 
-    def get_tweet_hook_prompt(self, item: dict) -> str:
-        return prompts.build_tweet_hook_prompt(item)
+    def get_tweet_hook_prompt(self, item: dict, lang: str = "en") -> str:
+        return prompts.build_tweet_hook_prompt(item, lang=lang)
 
     def get_chat_system_prompt(self) -> str:
         return prompts.CHAT_SYSTEM_PROMPT
