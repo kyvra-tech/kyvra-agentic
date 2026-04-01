@@ -1,32 +1,6 @@
 from modules.base import BaseModule, DataSource
-from modules.tech.config import (
-    KEYWORDS, SOURCE_AUTHORITY,
-    X_AI_LAB_ACCOUNTS, X_AI_LEADER_ACCOUNTS,
-    X_SOFTWARE_ENG_ACCOUNTS, X_INDIE_BUILDER_ACCOUNTS,
-    X_AI_RESEARCH_ACCOUNTS,
-)
+from modules.tech.config import KEYWORDS, SOURCE_AUTHORITY
 from modules.tech import prompts
-
-_X_LABS_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_AI_LAB_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
-_X_LEADERS_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_AI_LEADER_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
-_X_SWE_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_SOFTWARE_ENG_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
-_X_INDIE_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_INDIE_BUILDER_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
-_X_RESEARCH_QUERY = (
-    " OR ".join(f"from:{a}" for a in X_AI_RESEARCH_ACCOUNTS)
-    + " -is:retweet lang:en"
-)
 
 
 class TechModule(BaseModule):
@@ -34,119 +8,97 @@ class TechModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── X sources disabled — Twitter API credits depleted ──────────
-            # Uncomment to re-enable when API plan is upgraded
-            # DataSource(
-            #     name="X - AI Labs",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={"query": _X_LABS_QUERY, "max_results": 10},
-            #     authority_score=SOURCE_AUTHORITY["X - AI Labs"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - AI Leaders",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={"query": _X_LEADERS_QUERY, "max_results": 10},
-            #     authority_score=SOURCE_AUTHORITY["X - AI Leaders"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - Software Eng",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={"query": _X_SWE_QUERY, "max_results": 10},
-            #     authority_score=SOURCE_AUTHORITY["X - Software Eng"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - Indie Builders",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={"query": _X_INDIE_QUERY, "max_results": 10},
-            #     authority_score=SOURCE_AUTHORITY["X - Indie Builders"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - AI Research",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={"query": _X_RESEARCH_QUERY, "max_results": 10},
-            #     authority_score=SOURCE_AUTHORITY["X - AI Research"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # ── X: keyword-based signal discovery (disabled) ──────────────
-            # DataSource(
-            #     name="X - AI Trending",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={
-            #         "query": "(AI agent OR LLM OR Claude OR Gemini OR GPT OR MCP) -is:retweet lang:en",
-            #         "max_results": 10,
-            #     },
-            #     authority_score=SOURCE_AUTHORITY["X - AI Trending"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - AI Tools",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={
-            #         "query": "(cursor AI OR copilot OR replit OR \"v0.dev\" OR lovable OR windsurf) -is:retweet lang:en",
-            #         "max_results": 10,
-            #     },
-            #     authority_score=SOURCE_AUTHORITY["X - AI Tools"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # DataSource(
-            #     name="X - OSS",
-            #     url="https://api.twitter.com/2/tweets/search/recent",
-            #     source_type="x",
-            #     params={
-            #         "query": "(\"open source\" OR \"just open sourced\" OR \"MIT license\" OR \"github stars\") (AI OR LLM OR model) -is:retweet lang:en",
-            #         "max_results": 10,
-            #     },
-            #     authority_score=SOURCE_AUTHORITY["X - OSS"],
-            #     bypass_keyword_filter=True,
-            # ),
-            # ── GitHub Trending: native dev signal ────────────────────────
-            DataSource(
-                name="GitHub Trending",
-                url="https://github.com/trending",
-                source_type="scrape",
-                params={"language": "", "since": "daily"},
-                authority_score=SOURCE_AUTHORITY["GitHub Trending"],
-            ),
-            # ── Reddit RSS: community discussion signal ────────────────────
-            DataSource(
-                name="Reddit - ML",
-                url="https://www.reddit.com/r/MachineLearning/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY.get("Reddit - ML", 11),
-            ),
-            DataSource(
-                name="Reddit - LocalLLaMA",
-                url="https://www.reddit.com/r/LocalLLaMA/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY.get("Reddit - LocalLLaMA", 10),
-            ),
-            DataSource(
-                name="Reddit - SideProject",
-                url="https://www.reddit.com/r/SideProject/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY.get("Reddit - SideProject", 9),
-            ),
-            # ── TLDR Tech newsletter feed ──────────────────────────────────
+            # ── Tier 1: curated tech newsletters & aggregators ────────────
             DataSource(
                 name="TLDR Tech",
                 url="https://tldr.tech/api/rss/tech",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY.get("TLDR Tech", 12),
+                authority_score=SOURCE_AUTHORITY.get("TLDR Tech", 15),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Hacker News",
+                url="https://hnrss.org/frontpage",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Hacker News", 16),
+            ),
+            # ── Tier 2: AI lab official feeds ─────────────────────────────
+            DataSource(
+                name="Anthropic Blog",
+                url="https://www.anthropic.com/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Anthropic Blog", 18),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="OpenAI Blog",
+                url="https://openai.com/blog/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("OpenAI Blog", 18),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Google DeepMind",
+                url="https://deepmind.google/blog/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Google DeepMind", 17),
+                bypass_keyword_filter=True,
+            ),
+            # ── Tier 3: tech publications ──────────────────────────────────
+            DataSource(
+                name="TechCrunch",
+                url="https://techcrunch.com/feed/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("TechCrunch", 16),
+            ),
+            DataSource(
+                name="The Verge",
+                url="https://www.theverge.com/rss/index.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("The Verge", 15),
+            ),
+            DataSource(
+                name="Ars Technica",
+                url="https://feeds.arstechnica.com/arstechnica/index",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Ars Technica", 15),
+            ),
+            DataSource(
+                name="MIT Tech Review",
+                url="https://www.technologyreview.com/feed/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("MIT Tech Review", 17),
+            ),
+            # ── Tier 4: GitHub trending ────────────────────────────────────
+            DataSource(
+                name="GitHub Trending",
+                url="https://github.com/trending",
+                source_type="scrape",
+                params={"language": "", "since": "daily"},
+                authority_score=SOURCE_AUTHORITY.get("GitHub Trending", 14),
+            ),
+            # ── Tier 5: NewsAPI AI/tech keyword search ────────────────────
+            DataSource(
+                name="NewsAPI - AI",
+                url="https://newsapi.org/v2/everything",
+                source_type="newsapi",
+                params={
+                    "endpoint": "everything",
+                    "q": "artificial intelligence OR LLM OR ChatGPT OR Claude AI OR Gemini AI",
+                    "sort_by": "publishedAt",
+                    "page_size": 15,
+                },
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - AI", 14),
+                bypass_keyword_filter=True,
             ),
         ]
 

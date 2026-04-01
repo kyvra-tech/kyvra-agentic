@@ -8,50 +8,60 @@ class EnergyModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── NewsAPI: energy keyword search ────────────────────────────
+            # ── Tier 1: specialist energy outlets ─────────────────────────
+            DataSource(
+                name="OilPrice.com",
+                url="https://oilprice.com/rss/main",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("OilPrice.com", 17),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Energy Monitor",
+                url="https://www.energymonitor.ai/feed/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Energy Monitor", 16),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="S&P Global Energy",
+                url="https://www.spglobal.com/commodityinsights/en/rss-feed/oil",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("S&P Global Energy", 17),
+                bypass_keyword_filter=True,
+            ),
+            # ── Tier 2: wire services ──────────────────────────────────────
+            DataSource(
+                name="Reuters Energy",
+                url="https://feeds.reuters.com/reuters/businessNews",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reuters Energy", 20),
+            ),
+            # ── Tier 3: NewsAPI energy keyword search ─────────────────────
             DataSource(
                 name="NewsAPI - Energy",
                 url="https://newsapi.org/v2/everything",
                 source_type="newsapi",
                 params={
                     "endpoint": "everything",
-                    "q": "oil OR gas OR OPEC OR renewable energy OR energy crisis",
+                    "q": "oil price OR OPEC OR natural gas OR renewable energy OR energy crisis",
                     "sort_by": "publishedAt",
-                    "page_size": 20,
+                    "page_size": 15,
                 },
-                authority_score=SOURCE_AUTHORITY["NewsAPI - Energy"],
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Energy", 14),
                 bypass_keyword_filter=True,
             ),
-            # ── RSS: specialist energy publications ────────────────────────
+            # ── Tier 4: Google News energy ─────────────────────────────────
             DataSource(
-                name="Reuters Energy",
-                url="https://feeds.reuters.com/reuters/businessNews",
+                name="Google News - Energy",
+                url="https://news.google.com/rss/search?q=oil+gas+energy+OPEC&hl=en-US&gl=US&ceid=US:en",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reuters Energy"],
-            ),
-            DataSource(
-                name="OilPrice.com",
-                url="https://oilprice.com/rss/main",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["OilPrice.com"],
-                bypass_keyword_filter=True,
-            ),
-            # ── Reddit RSS ─────────────────────────────────────────────────
-            DataSource(
-                name="Reddit - Energy",
-                url="https://www.reddit.com/r/energy/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Energy"],
-            ),
-            DataSource(
-                name="Reddit - Renewables",
-                url="https://www.reddit.com/r/renewable/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Renewables"],
+                authority_score=SOURCE_AUTHORITY.get("Google News - Energy", 13),
             ),
         ]
 

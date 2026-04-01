@@ -8,22 +8,22 @@ class HumorModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── NewsAPI: entertainment category ───────────────────────────
+            # ── Tier 1: NewsAPI entertainment category ────────────────────
             DataSource(
                 name="NewsAPI - Entertainment",
                 url="https://newsapi.org/v2/top-headlines",
                 source_type="newsapi",
                 params={"endpoint": "top-headlines", "category": "entertainment", "page_size": 20},
-                authority_score=SOURCE_AUTHORITY["NewsAPI - Entertainment"],
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Entertainment", 16),
                 bypass_keyword_filter=True,
             ),
-            # ── RSS: trade publications ────────────────────────────────────
+            # ── Tier 2: trade publications ─────────────────────────────────
             DataSource(
                 name="Variety",
                 url="https://variety.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Variety"],
+                authority_score=SOURCE_AUTHORITY.get("Variety", 17),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -31,30 +31,33 @@ class HumorModule(BaseModule):
                 url="https://www.hollywoodreporter.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Hollywood Reporter"],
+                authority_score=SOURCE_AUTHORITY.get("Hollywood Reporter", 17),
                 bypass_keyword_filter=True,
             ),
-            # ── Reddit RSS: community signal ───────────────────────────────
             DataSource(
-                name="Reddit - Movies",
-                url="https://www.reddit.com/r/movies/new/.rss",
+                name="Entertainment Weekly",
+                url="https://ew.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Movies"],
+                authority_score=SOURCE_AUTHORITY.get("Entertainment Weekly", 16),
+                bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - Television",
-                url="https://www.reddit.com/r/television/new/.rss",
+                name="Deadline",
+                url="https://deadline.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Television"],
+                authority_score=SOURCE_AUTHORITY.get("Deadline", 16),
+                bypass_keyword_filter=True,
             ),
+            # ── Tier 3: Google News entertainment ─────────────────────────
             DataSource(
-                name="Reddit - Entertainment",
-                url="https://www.reddit.com/r/entertainment/new/.rss",
+                name="Google News - Entertainment",
+                url="https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNREpxYW5RU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Entertainment"],
+                authority_score=SOURCE_AUTHORITY.get("Google News - Entertainment", 13),
+                bypass_keyword_filter=True,
             ),
         ]
 
@@ -83,5 +86,4 @@ class HumorModule(BaseModule):
         return KEYWORDS
 
     def get_spike_thresholds(self) -> tuple[int, int]:
-        # Entertainment moves fast — lower thresholds
         return (50, 200)

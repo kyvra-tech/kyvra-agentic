@@ -8,20 +8,13 @@ class PoliticalModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
+            # ── Tier 1: wire services ──────────────────────────────────────
             DataSource(
-                name="Reuters",
+                name="Reuters Politics",
                 url="https://feeds.reuters.com/reuters/politicsNews",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reuters"],
-                bypass_keyword_filter=True,
-            ),
-            DataSource(
-                name="BBC News",
-                url="https://feeds.bbci.co.uk/news/politics/rss.xml",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["BBC News"],
+                authority_score=SOURCE_AUTHORITY.get("Reuters", 20),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -29,7 +22,16 @@ class PoliticalModule(BaseModule):
                 url="https://rsshub.app/apnews/topics/politics",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["AP News"],
+                authority_score=SOURCE_AUTHORITY.get("AP News", 19),
+                bypass_keyword_filter=True,
+            ),
+            # ── Tier 2: international broadcasters ────────────────────────
+            DataSource(
+                name="BBC News Politics",
+                url="https://feeds.bbci.co.uk/news/politics/rss.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("BBC News", 19),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -37,28 +39,38 @@ class PoliticalModule(BaseModule):
                 url="https://www.aljazeera.com/xml/rss/all.xml",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Al Jazeera"],
+                authority_score=SOURCE_AUTHORITY.get("Al Jazeera", 17),
             ),
             DataSource(
-                name="The Guardian",
+                name="The Guardian Politics",
                 url="https://www.theguardian.com/politics/rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["The Guardian"],
+                authority_score=SOURCE_AUTHORITY.get("The Guardian", 16),
             ),
             DataSource(
-                name="Reddit - Politics",
-                url="https://www.reddit.com/r/politics/new/.rss",
+                name="Politico",
+                url="https://www.politico.com/rss/politicopicks.xml",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Politics"],
+                authority_score=SOURCE_AUTHORITY.get("Politico", 17),
+                bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - WorldNews",
-                url="https://www.reddit.com/r/worldnews/new/.rss",
+                name="The Hill",
+                url="https://thehill.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - WorldNews"],
+                authority_score=SOURCE_AUTHORITY.get("The Hill", 15),
+            ),
+            # ── Tier 3: NewsAPI politics ───────────────────────────────────
+            DataSource(
+                name="NewsAPI - Politics",
+                url="https://newsapi.org/v2/top-headlines",
+                source_type="newsapi",
+                params={"endpoint": "top-headlines", "category": "general", "page_size": 15},
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Politics", 14),
+                bypass_keyword_filter=False,
             ),
         ]
 

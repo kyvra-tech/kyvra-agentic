@@ -8,12 +8,13 @@ class SportModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
+            # ── Tier 1: major sports broadcasters ─────────────────────────
             DataSource(
                 name="ESPN",
                 url="https://www.espn.com/espn/rss/news",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["ESPN"],
+                authority_score=SOURCE_AUTHORITY.get("ESPN", 19),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -21,7 +22,7 @@ class SportModule(BaseModule):
                 url="https://feeds.bbci.co.uk/sport/rss.xml",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["BBC Sport"],
+                authority_score=SOURCE_AUTHORITY.get("BBC Sport", 18),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -29,7 +30,7 @@ class SportModule(BaseModule):
                 url="https://www.skysports.com/rss/12040",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Sky Sports"],
+                authority_score=SOURCE_AUTHORITY.get("Sky Sports", 17),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -37,35 +38,33 @@ class SportModule(BaseModule):
                 url="https://www.goal.com/feeds/en/news",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Goal.com"],
+                authority_score=SOURCE_AUTHORITY.get("Goal.com", 16),
+                bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - Soccer",
-                url="https://www.reddit.com/r/soccer/new/.rss",
+                name="The Athletic",
+                url="https://theathletic.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Soccer"],
+                authority_score=SOURCE_AUTHORITY.get("The Athletic", 17),
+                bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - NBA",
-                url="https://www.reddit.com/r/nba/new/.rss",
+                name="Bleacher Report",
+                url="https://bleacherreport.com/articles/feed",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - NBA"],
+                authority_score=SOURCE_AUTHORITY.get("Bleacher Report", 15),
+                bypass_keyword_filter=True,
             ),
+            # ── Tier 2: NewsAPI sports ─────────────────────────────────────
             DataSource(
-                name="Reddit - NFL",
-                url="https://www.reddit.com/r/nfl/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - NFL"],
-            ),
-            DataSource(
-                name="Reddit - UFC",
-                url="https://www.reddit.com/r/ufc/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - UFC"],
+                name="NewsAPI - Sports",
+                url="https://newsapi.org/v2/top-headlines",
+                source_type="newsapi",
+                params={"endpoint": "top-headlines", "category": "sports", "page_size": 20},
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Sports", 15),
+                bypass_keyword_filter=True,
             ),
         ]
 
@@ -94,4 +93,4 @@ class SportModule(BaseModule):
         return KEYWORDS
 
     def get_spike_thresholds(self) -> tuple[int, int]:
-        return (50, 300)  # lower thresholds — sports content spikes faster
+        return (50, 300)

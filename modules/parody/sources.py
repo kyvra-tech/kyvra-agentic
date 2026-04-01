@@ -8,12 +8,13 @@ class ParodyModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
+            # ── Tier 1: satire publications ────────────────────────────────
             DataSource(
                 name="The Onion",
                 url="https://www.theonion.com/rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["The Onion"],
+                authority_score=SOURCE_AUTHORITY.get("The Onion", 20),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -21,29 +22,32 @@ class ParodyModule(BaseModule):
                 url="https://clickhole.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["ClickHole"],
+                authority_score=SOURCE_AUTHORITY.get("ClickHole", 18),
                 bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - NotTheOnion",
-                url="https://www.reddit.com/r/nottheonion/new/.rss",
+                name="The Babylon Bee",
+                url="https://babylonbee.com/feed",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - NotTheOnion"],
+                authority_score=SOURCE_AUTHORITY.get("The Babylon Bee", 16),
+                bypass_keyword_filter=True,
             ),
             DataSource(
-                name="Reddit - Funny",
-                url="https://www.reddit.com/r/funny/new/.rss",
+                name="The Beaverton",
+                url="https://www.thebeaverton.com/feed/",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Funny"],
+                authority_score=SOURCE_AUTHORITY.get("The Beaverton", 15),
+                bypass_keyword_filter=True,
             ),
+            # ── Tier 2: real news that sounds fake (Google News RSS) ───────
             DataSource(
-                name="Reddit - Unexpected",
-                url="https://www.reddit.com/r/Unexpected/new/.rss",
+                name="Google News - Weird",
+                url="https://news.google.com/rss/search?q=unbelievable+bizarre+absurd&hl=en-US&gl=US&ceid=US:en",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Unexpected"],
+                authority_score=SOURCE_AUTHORITY.get("Google News - Weird", 12),
             ),
         ]
 

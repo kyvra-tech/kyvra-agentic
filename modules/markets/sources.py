@@ -8,13 +8,52 @@ class MarketsModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── NewsAPI: business category + market keyword search ─────────
+            # ── Tier 1: financial wire & publications ──────────────────────
+            DataSource(
+                name="Reuters Business",
+                url="https://feeds.reuters.com/reuters/businessNews",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Reuters Business", 20),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="MarketWatch",
+                url="https://feeds.marketwatch.com/marketwatch/topstories/",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("MarketWatch", 17),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Financial Times",
+                url="https://www.ft.com/rss/home",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Financial Times", 19),
+                bypass_keyword_filter=True,
+            ),
+            DataSource(
+                name="Seeking Alpha",
+                url="https://seekingalpha.com/feed.xml",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Seeking Alpha", 15),
+            ),
+            DataSource(
+                name="Investopedia",
+                url="https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY.get("Investopedia", 15),
+            ),
+            # ── Tier 2: NewsAPI business + markets ────────────────────────
             DataSource(
                 name="NewsAPI - Business",
                 url="https://newsapi.org/v2/top-headlines",
                 source_type="newsapi",
                 params={"endpoint": "top-headlines", "category": "business", "page_size": 20},
-                authority_score=SOURCE_AUTHORITY["NewsAPI - Business"],
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Business", 16),
                 bypass_keyword_filter=True,
             ),
             DataSource(
@@ -23,51 +62,21 @@ class MarketsModule(BaseModule):
                 source_type="newsapi",
                 params={
                     "endpoint": "everything",
-                    "q": "stock market OR S&P 500 OR Federal Reserve OR interest rates OR earnings",
+                    "q": "stock market OR S&P 500 OR Federal Reserve OR interest rates OR Wall Street",
                     "sort_by": "publishedAt",
-                    "page_size": 20,
+                    "page_size": 15,
                 },
-                authority_score=SOURCE_AUTHORITY["NewsAPI - Markets"],
+                authority_score=SOURCE_AUTHORITY.get("NewsAPI - Markets", 15),
                 bypass_keyword_filter=True,
             ),
-            # ── RSS: financial publications ────────────────────────────────
+            # ── Tier 3: Google News markets ────────────────────────────────
             DataSource(
-                name="Reuters Business",
-                url="https://feeds.reuters.com/reuters/businessNews",
+                name="Google News - Markets",
+                url="https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["Reuters Business"],
+                authority_score=SOURCE_AUTHORITY.get("Google News - Markets", 13),
                 bypass_keyword_filter=True,
-            ),
-            DataSource(
-                name="MarketWatch",
-                url="https://feeds.marketwatch.com/marketwatch/topstories/",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["MarketWatch"],
-                bypass_keyword_filter=True,
-            ),
-            # ── Reddit RSS: retail investor sentiment ──────────────────────
-            DataSource(
-                name="Reddit - Investing",
-                url="https://www.reddit.com/r/investing/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - Investing"],
-            ),
-            DataSource(
-                name="Reddit - StockMarket",
-                url="https://www.reddit.com/r/StockMarket/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - StockMarket"],
-            ),
-            DataSource(
-                name="Reddit - WallStreetBets",
-                url="https://www.reddit.com/r/wallstreetbets/new/.rss",
-                source_type="rss",
-                params={},
-                authority_score=SOURCE_AUTHORITY["Reddit - WallStreetBets"],
             ),
         ]
 
