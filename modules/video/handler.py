@@ -4,7 +4,7 @@ Media caption handler — download video/image, generate Twitter caption via Dee
 import logging
 from pathlib import Path
 
-from modules.video.downloader import download_media, cleanup_video_files, is_supported_url
+from modules.video.downloader import download_media, cleanup_video_files
 from modules.video.caption_agent import generate_twitter_caption
 from modules.video.config import MAX_VIDEO_SIZE_BYTES
 
@@ -37,9 +37,6 @@ async def process_media_url(url: str) -> dict:
       - title: str
       - error: str | None
     """
-    if not is_supported_url(url):
-        return {"error": "Unsupported URL. Supported: YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit"}
-
     # Single call: inspect → download only what exists (video, image, or nothing)
     info = await download_media(url)
 

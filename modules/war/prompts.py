@@ -154,7 +154,7 @@ Write a 60-second factual conflict voiceover:
 Rules: 150-180 words. Factual. Serious. No glorification of violence."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are a conflict journalist writing for Twitter.
 
 Story:
@@ -167,5 +167,7 @@ Write exactly 1 tweet hook (max 280 chars) that:
 - Makes clear why this matters right now
 - Serious, factual, compelling — not sensationalist
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""

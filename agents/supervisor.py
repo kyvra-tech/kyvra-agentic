@@ -202,15 +202,9 @@ class SupervisorAgent:
             rank=rank,
         )
 
-    async def generate_tweet_hook(self, rank: int = 1) -> str:
-        """Generate a single viral tweet hook for story #rank using the last cached pipeline result."""
+    async def generate_tweet_hook(self, rank: int = 1, lang: str = "en") -> str:
+        """Generate a single viral tweet hook for story #rank in the given language (en|ja)."""
         import services.llm as llm
-
-        # Re-use cached status items if available, else do a quick scan
-        cached = _STATUS_CACHE.get(self.module.name)
-        if cached and (time.time() - cached["timestamp"]) < _STATUS_CACHE_TTL:
-            # We have a recent pipeline run — re-collect to get top_items
-            pass  # fall through to quick scan below
 
         ctx = await self._collect_and_score()
         if not ctx.top_items:
@@ -218,10 +212,10 @@ class SupervisorAgent:
 
         clamped = max(1, min(rank, len(ctx.top_items)))
         item = ctx.top_items[clamped - 1]
-        prompt = self.module.get_tweet_hook_prompt(self._item_dict(item))
+        prompt = self.module.get_tweet_hook_prompt(self._item_dict(item), lang=lang)
 
         try:
-            return await llm.complete(prompt, max_tokens=120)
+            return await llm.complete(prompt, max_tokens=160)
         except Exception as e:
             logger.error("[Supervisor] tweet_hook LLM call failed: %s", e)
             return "Could not generate tweet. Try again later."

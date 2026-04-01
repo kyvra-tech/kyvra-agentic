@@ -153,7 +153,7 @@ Write a 60-second cynical political voiceover:
 Rules: 150-180 words. Sharp throughout. Factually grounded."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are a sharp political Twitter writer.
 
 Story:
@@ -166,5 +166,7 @@ Write exactly 1 tweet hook (max 280 chars) that:
 - Cuts through the spin in one sentence
 - Makes people want to quote-tweet and argue
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""

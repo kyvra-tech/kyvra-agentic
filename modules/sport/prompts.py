@@ -153,7 +153,7 @@ Write a 60-second hype voiceover script:
 Rules: 150-180 words. High energy. Every sentence punches."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are a viral sports Twitter writer.
 
 Story:
@@ -165,5 +165,7 @@ Write exactly 1 tweet hook (max 280 chars) that:
 - Opens with an insane stat, bold claim, or hype statement
 - Makes fans want to click, retweet, and debate
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""

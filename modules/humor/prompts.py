@@ -153,7 +153,7 @@ Write a 60-second energetic entertainment voiceover script:
 Rules: 150-200 words. High energy. Conversational. No corporate speak."""
 
 
-def build_tweet_hook_prompt(item: dict) -> str:
+def build_tweet_hook_prompt(item: dict, lang: str = "en") -> str:
     return f"""You are a viral entertainment Twitter writer.
 
 Story:
@@ -165,5 +165,7 @@ Write exactly 1 tweet (max 280 chars) that:
 - Leads with the most surprising or funny angle
 - Makes people want to click, quote-tweet, or reply
 - Ends with the URL on its own line
+
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
 
 Output ONLY the tweet text. No explanation."""
