@@ -1,32 +1,32 @@
 """
-LLM service — Ollama (Gemma 3) as primary model.
+LLM service — DeepSeek API as primary model.
 
-Requires Ollama running locally: https://ollama.com
-Run: ollama pull gemma3
+Get your key at: platform.deepseek.com
+Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL in .env
 """
 import logging
 from openai import AsyncOpenAI
-from config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from config import DEEPSEEK_API_KEY, DEEPSEEK_MODEL
 
 logger = logging.getLogger(__name__)
 
-_ollama_client: AsyncOpenAI | None = None
+_client: AsyncOpenAI | None = None
 
 
-def _get_ollama_client() -> AsyncOpenAI:
-    global _ollama_client
-    if _ollama_client is None:
-        _ollama_client = AsyncOpenAI(
-            api_key="ollama",  # pragma: allowlist secret
-            base_url=f"{OLLAMA_BASE_URL}/v1",
+def _get_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(
+            api_key=DEEPSEEK_API_KEY,
+            base_url="https://api.deepseek.com/v1",
         )
-    return _ollama_client
+    return _client
 
 
-async def _call_ollama(messages: list[dict], max_tokens: int) -> str:
-    logger.info(f"[LLM] Using Ollama ({OLLAMA_MODEL}) at {OLLAMA_BASE_URL}")
-    response = await _get_ollama_client().chat.completions.create(
-        model=OLLAMA_MODEL,
+async def _call(messages: list[dict], max_tokens: int) -> str:
+    logger.info(f"[LLM] Using DeepSeek ({DEEPSEEK_MODEL})")
+    response = await _get_client().chat.completions.create(
+        model=DEEPSEEK_MODEL,
         max_tokens=max_tokens,
         messages=messages,
     )
@@ -34,10 +34,10 @@ async def _call_ollama(messages: list[dict], max_tokens: int) -> str:
 
 
 async def complete(prompt: str, max_tokens: int = 2000) -> str:
-    """Single-turn completion via Ollama."""
-    return await _call_ollama([{"role": "user", "content": prompt}], max_tokens)
+    """Single-turn completion via DeepSeek."""
+    return await _call([{"role": "user", "content": prompt}], max_tokens)
 
 
 async def chat(messages: list[dict], max_tokens: int = 1000) -> str:
-    """Multi-turn chat via Ollama."""
-    return await _call_ollama(messages, max_tokens)
+    """Multi-turn chat via DeepSeek."""
+    return await _call(messages, max_tokens)

@@ -3,27 +3,42 @@ import hmac
 import json
 import logging
 import httpx
+from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
-from agents.supervisor import generate_report_for_module_with_ctx
+from agents.supervisor import SupervisorAgent, load_module
 from interfaces.telegram.formatter import split_long_message, _signal_label_key
 from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE, TRENDPOST_WEBHOOK_URL, TRENDPOST_WEBHOOK_SECRET
 
 logger = logging.getLogger(__name__)
 
-# All active modules get a report on every scheduled run, sent serially.
-_ALL_MODULES = ["tech", "crypto", "vietnam", "indie"]
+_VN_TZ = timezone(timedelta(hours=7))
+
+# All active modules included in the combined daily digest.
+_ALL_MODULES = [
+    "tech", "crypto", "parody", "sport", "political",
+    "war", "humor", "energy", "markets",
+]
+
+# Module display names and emoji headers for the digest
+_MODULE_META = {
+    "tech":      ("🤖", "Tech & AI"),
+    "crypto":    ("₿",  "Crypto"),
+    "parody":    ("🤡", "Parody"),
+    "sport":     ("⚽", "Sport"),
+    "political": ("🏛️", "Politics"),
+    "war":       ("⚔️", "Geopolitics & War"),
+    "humor":     ("🎬", "Entertainment"),
+    "energy":    ("⚡", "Energy"),
+    "markets":   ("📈", "Markets"),
+}
+
+_ITEMS_PER_MODULE = 2  # top stories per module in the combined digest
 
 
 async def _push_to_trendpost(module_name: str, supervisor_ctx) -> None:
-    """
-    Push top stories for a module to TrendPost via HMAC-signed webhook.
-    Called from _send_all_module_reports after each module report is generated.
-
-    Only runs when TRENDPOST_WEBHOOK_URL and TRENDPOST_WEBHOOK_SECRET are configured.
-    Failures are logged but never raise — Telegram delivery must not be blocked.
-    """
+    """Push top stories for a module to TrendPost via HMAC-signed webhook."""
     if not TRENDPOST_WEBHOOK_URL or not TRENDPOST_WEBHOOK_SECRET:
         return
 
@@ -75,30 +90,61 @@ async def _push_to_trendpost(module_name: str, supervisor_ctx) -> None:
         logger.error("[TrendPost push] Module '%s' failed: %s", module_name, exc)
 
 
-async def _send_all_module_reports(bot: Bot) -> None:
-    """Generate and send reports for all modules to all configured chats, serially."""
+def _format_module_section(module_name: str, top_items: list) -> str:
+    """Format 2 top items from a module as a compact digest section."""
+    emoji, label = _MODULE_META.get(module_name, ("📌", module_name.capitalize()))
+    lines = [f"{emoji} *{label}*"]
+    for i, item in enumerate(top_items[:_ITEMS_PER_MODULE], 1):
+        title = item.title[:100] + ("…" if len(item.title) > 100 else "")
+        score = item.confidence_score
+        lines.append(f"  {i}\\. [{score}] {title}")
+        lines.append(f"     {item.url}")
+    return "\n".join(lines)
+
+
+async def _send_combined_digest(bot: Bot) -> None:
+    """
+    Collect top 2 stories from every module in parallel (quick scan, no LLM),
+    assemble a single combined digest message, and send it once to all chats.
+    """
     if not REPORT_CHAT_IDS:
         logger.warning("[Scheduler] No REPORT_CHAT_IDS configured — skipping.")
         return
 
+    now = datetime.now(_VN_TZ).strftime("%d/%m/%Y %H:%M GMT+7")
+    sections = []
+    trendpost_tasks = []
+
     for module_name in _ALL_MODULES:
-        logger.info("[Scheduler] Generating report for module: %s", module_name)
-        ctx = None
+        logger.info("[Scheduler] Scanning module: %s", module_name)
         try:
-            report, ctx = await generate_report_for_module_with_ctx(module_name)
+            supervisor = SupervisorAgent(load_module(module_name))
+            ctx = await supervisor.quick_scan()
+            if ctx.top_items:
+                sections.append(_format_module_section(module_name, ctx.top_items))
+                trendpost_tasks.append((module_name, ctx))
+            else:
+                logger.info("[Scheduler] No items for module '%s' — skipped from digest", module_name)
         except Exception as e:
-            logger.error("[Scheduler] Report failed for module '%s': %s", module_name, e)
-            continue  # other modules still run
+            logger.error("[Scheduler] Scan failed for module '%s': %s", module_name, e)
 
-        for chat_id in REPORT_CHAT_IDS:
-            try:
-                for chunk in split_long_message(report):
-                    await bot.send_message(chat_id=chat_id, text=chunk, parse_mode="Markdown")
-                logger.info("[Scheduler] %s report sent to %s", module_name, chat_id)
-            except Exception as e:
-                logger.error("[Scheduler] Failed to send %s report to %s: %s", module_name, chat_id, e)
+    if not sections:
+        logger.warning("[Scheduler] All modules returned empty — digest not sent.")
+        return
 
-        # Push top stories to TrendPost (non-blocking — failures are logged only)
+    header = f"🌅 *Kyvra Daily Digest — {now}*\nTop stories across all modules\n"
+    digest = header + "\n\n" + "\n\n".join(sections)
+
+    for chat_id in REPORT_CHAT_IDS:
+        try:
+            for chunk in split_long_message(digest):
+                await bot.send_message(chat_id=chat_id, text=chunk, parse_mode="Markdown")
+            logger.info("[Scheduler] Combined digest sent to %s", chat_id)
+        except Exception as e:
+            logger.error("[Scheduler] Failed to send digest to %s: %s", chat_id, e)
+
+    # Push to TrendPost (non-blocking)
+    for module_name, ctx in trendpost_tasks:
         await _push_to_trendpost(module_name, ctx)
 
 
@@ -106,19 +152,11 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     hour, minute = REPORT_TIME.split(":")
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.add_job(
-        _send_all_module_reports,
+        _send_combined_digest,
         trigger=CronTrigger(hour=int(hour), minute=int(minute), timezone=TIMEZONE),
         args=[bot],
         id="morning_digest",
         replace_existing=True,
     )
-    logger.info("[Scheduler] Morning digest scheduled at %s (%s)", REPORT_TIME, TIMEZONE)
-    scheduler.add_job(
-        _send_all_module_reports,
-        trigger=CronTrigger(hour=20, minute=0, timezone=TIMEZONE),
-        args=[bot],
-        id="evening_digest",
-        replace_existing=True,
-    )
-    logger.info("[Scheduler] Evening digest scheduled at 20:00 (%s)", TIMEZONE)
+    logger.info("[Scheduler] Daily digest scheduled at %s (%s)", REPORT_TIME, TIMEZONE)
     return scheduler
