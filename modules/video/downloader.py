@@ -88,7 +88,7 @@ async def fetch_video_info(url: str) -> VideoInfo:
 
         data = await asyncio.to_thread(_run)
         info.title = data.get("title", "")
-        info.description = (data.get("description") or "")[:1000]
+        info.description = (data.get("description") or "")[:3000]
         info.thumbnail_url = data.get("thumbnail", "")
         info.duration = data.get("duration", 0) or 0
 
@@ -130,7 +130,7 @@ async def download_media(url: str) -> VideoInfo:
 
         data = await asyncio.to_thread(_get_info)
         info.title = data.get("title", "")
-        info.description = (data.get("description") or "")[:1000]
+        info.description = (data.get("description") or "")[:3000]
         info.thumbnail_url = data.get("thumbnail", "")
         info.duration = data.get("duration", 0) or 0
         video_id = data.get("id", "unknown")
