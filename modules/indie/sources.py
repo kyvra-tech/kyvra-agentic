@@ -15,15 +15,9 @@ class IndieModule(BaseModule):
 
     def get_sources(self) -> list[DataSource]:
         return [
-            # ── X: indie builders — primary real-time signal ───────────────
-            DataSource(
-                name="X - Indie Builders",
-                url="https://api.twitter.com/2/tweets/search/recent",
-                source_type="x",
-                params={"query": _X_INDIE_QUERY, "max_results": 15},
-                authority_score=SOURCE_AUTHORITY["X - Indie Builders"],
-                bypass_keyword_filter=True,
-            ),
+            # ── X: indie builders disabled — API credits depleted ──────────
+            # DataSource(name="X - Indie Builders", ...),
+
             # ── RSS: community & launch platforms ─────────────────────────
             DataSource(
                 name="Hacker News",
