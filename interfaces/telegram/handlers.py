@@ -338,8 +338,27 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/newsletter [rank] — newsletter section. /newsletter 2 = from story #2."""
+    """/newsletter [rank|url] — newsletter from top story, story #N, or any URL."""
     user_id = update.effective_user.id
+    arg = " ".join(context.args).strip() if context.args else ""
+
+    # URL mode: /newsletter https://...
+    if arg.startswith("http"):
+        logger.info(f"[Analytics] user={user_id} command=newsletter url={arg[:80]}")
+        msg = await update.message.reply_text("📰 Reading article and writing newsletter section...")
+        try:
+            supervisor = SupervisorAgent(_get_module())
+            newsletter = await supervisor.generate_newsletter_from_url(arg, user_id=user_id)
+        except Exception as e:
+            logger.error(f"Newsletter from URL failed: {e}")
+            await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
+            return
+        await msg.delete()
+        for chunk in split_long_message(newsletter):
+            await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
+        return
+
+    # Rank mode: /newsletter [N]
     rank, err = _parse_rank(context.args or [])
     if err:
         await update.message.reply_text(f"ℹ️ {err}")
