@@ -338,7 +338,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/newsletter [rank|url] — newsletter from top story, story #N, or any URL."""
+    """/newsletter [rank|url|description] — newsletter from top story, #N, URL, or pasted text."""
     user_id = update.effective_user.id
     arg = " ".join(context.args).strip() if context.args else ""
 
@@ -351,6 +351,22 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             newsletter = await supervisor.generate_newsletter_from_url(arg, user_id=user_id)
         except Exception as e:
             logger.error(f"Newsletter from URL failed: {e}")
+            await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
+            return
+        await msg.delete()
+        for chunk in split_long_message(newsletter):
+            await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
+        return
+
+    # Text/description mode: /newsletter <any plain text longer than a number>
+    if arg and not arg.isdigit():
+        logger.info(f"[Analytics] user={user_id} command=newsletter text len={len(arg)}")
+        msg = await update.message.reply_text("📰 Writing newsletter section from your description...")
+        try:
+            supervisor = SupervisorAgent(_get_module())
+            newsletter = await supervisor.generate_newsletter_from_text(arg, user_id=user_id)
+        except Exception as e:
+            logger.error(f"Newsletter from text failed: {e}")
             await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
             return
         await msg.delete()
