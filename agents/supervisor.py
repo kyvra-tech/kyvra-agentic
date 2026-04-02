@@ -220,6 +220,25 @@ class SupervisorAgent:
             logger.error("[Supervisor] tweet_hook LLM call failed: %s", e)
             return "Could not generate tweet. Try again later."
 
+    async def generate_newsletter_from_text(self, text: str, user_id: int | None = None) -> str:
+        """Write a newsletter section directly from a pasted description or summary."""
+        import services.llm as llm
+        voice = memory.get_voice_profile(user_id) if user_id is not None else None
+        item = {
+            "title": text[:80],
+            "url": "",
+            "source": "User input",
+            "summary": text,
+            "confidence_score": 80,
+            "is_spike": False,
+        }
+        prompt = self.module.get_newsletter_prompt(item, voice=voice)
+        try:
+            return await llm.complete(prompt, max_tokens=800)
+        except Exception as e:
+            logger.error("[Supervisor] newsletter_from_text LLM call failed: %s", e)
+            return "Could not generate newsletter section right now. Try again later."
+
     async def generate_newsletter_from_url(self, url: str, user_id: int | None = None) -> str:
         """Fetch a URL, extract its content, and write a newsletter section from it."""
         import services.llm as llm
