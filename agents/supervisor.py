@@ -220,6 +220,31 @@ class SupervisorAgent:
             logger.error("[Supervisor] tweet_hook LLM call failed: %s", e)
             return "Could not generate tweet. Try again later."
 
+    async def generate_newsletter_from_url(self, url: str, user_id: int | None = None) -> str:
+        """Fetch a URL, extract its content, and write a newsletter section from it."""
+        import services.llm as llm
+        from utils.api_client import fetch_article
+
+        article = await fetch_article(url)
+        if article["error"] or not article["text"]:
+            return f"❌ Could not read the article at that URL. Make sure it's a public page."
+
+        voice = memory.get_voice_profile(user_id) if user_id is not None else None
+        item = {
+            "title": article["title"] or url,
+            "url": url,
+            "source": "URL",
+            "summary": article["text"],
+            "confidence_score": 80,
+            "is_spike": False,
+        }
+        prompt = self.module.get_newsletter_prompt(item, voice=voice)
+        try:
+            return await llm.complete(prompt, max_tokens=800)
+        except Exception as e:
+            logger.error("[Supervisor] newsletter_from_url LLM call failed: %s", e)
+            return "Could not generate newsletter section right now. Try again later."
+
     async def generate_report_with_ctx(self) -> tuple[str, "PipelineContext | None"]:
         """Full pipeline — returns (report_text, ctx) so callers can access top_items."""
         logger.info("[Supervisor] Starting full pipeline (with ctx)...")

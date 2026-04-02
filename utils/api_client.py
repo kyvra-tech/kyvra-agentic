@@ -202,6 +202,42 @@ async def fetch_newsapi(source: DataSource) -> list[RawItem]:
         return []
 
 
+async def fetch_article(url: str) -> dict:
+    """
+    Fetch a URL and extract title + body text for newsletter generation.
+    Returns dict with keys: title, text, url, error.
+    """
+    try:
+        async with httpx.AsyncClient(headers=HEADERS, timeout=20, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "lxml")
+
+        # Title
+        title_tag = soup.find("title")
+        title = title_tag.get_text(strip=True) if title_tag else ""
+
+        # Remove noise
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
+            tag.decompose()
+
+        # Prefer article body, fall back to main, then body
+        container = (
+            soup.find("article")
+            or soup.find("main")
+            or soup.find(class_=lambda c: c and any(x in c for x in ["article", "content", "post-body", "entry"]))
+            or soup.find("body")
+        )
+        text = container.get_text(separator=" ", strip=True) if container else ""
+        # Trim to ~3000 chars to stay within token budget
+        text = text[:3000]
+
+        return {"title": title, "text": text, "url": url, "error": None}
+    except Exception as e:
+        logger.warning(f"fetch_article failed for {url}: {e}")
+        return {"title": "", "text": "", "url": url, "error": str(e)}
+
+
 async def fetch_source(source: DataSource) -> list[RawItem]:
     if source.source_type == "rss":
         return await fetch_rss(source)
