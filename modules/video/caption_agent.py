@@ -33,7 +33,7 @@ async def generate_twitter_caption(
     try:
         response = await _get_client().chat.completions.create(
             model=DEEPSEEK_MODEL,
-            max_tokens=400,
+            max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.choices[0].message.content or ""
