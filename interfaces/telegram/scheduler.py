@@ -144,8 +144,8 @@ async def _send_combined_digest(bot: Bot) -> None:
             logger.error("[Scheduler] Failed to send digest to %s: %s", chat_id, e)
 
     # Push to TrendPost (non-blocking)
-    for module_name, ctx in trendpost_tasks:
-        await _push_to_trendpost(module_name, ctx)
+    # for module_name, ctx in trendpost_tasks:
+    #     await _push_to_trendpost(module_name, ctx)
 
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
