@@ -345,7 +345,7 @@ pytest tests/test_analyst.py -v
 Kyvra is free and open-source. If it saves you time, consider supporting development:
 
 - **GitHub Sponsors:** [github.com/sponsors/kyvra-tech](https://github.com/sponsors/kyvra-tech)
-- **USDT:** `0x03496bd8005a48843e2Bda7450bEeba9dB42Dbfd`
+- **USDT:** `0xd2AAe1C705DAc7F97c1af7f1d5438F43d1938e6f`
 - **Star the repo** — it helps more people find the project
 
 Built with love for crypto creators.
