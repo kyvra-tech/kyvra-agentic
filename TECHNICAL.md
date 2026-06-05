@@ -17,25 +17,23 @@ This document is the authoritative technical reference for engineers working on 
 9. [Services](#9-services)
 10. [Interfaces](#10-interfaces)
 11. [Data Models](#11-data-models)
-12. [TrendPost Integration](#12-trendpost-integration)
-13. [Video / Caption Pipeline](#13-video--caption-pipeline)
-14. [Memory & Persistence](#14-memory--persistence)
-15. [Testing](#15-testing)
-16. [Adding a New Module](#16-adding-a-new-module)
-17. [Deployment](#17-deployment)
-18. [Known Constraints](#18-known-constraints)
+12. [Video / Caption Pipeline](#12-video--caption-pipeline)
+13. [Memory & Persistence](#13-memory--persistence)
+14. [Testing](#14-testing)
+15. [Adding a New Module](#15-adding-a-new-module)
+16. [Deployment](#16-deployment)
+17. [Known Constraints](#17-known-constraints)
 
 ---
 
 ## 1. System Overview
 
-Kyvra Agentic is a multi-agent Python system that:
+Kyvra Agentic is a self-hostable multi-agent Python system that:
 
 1. **Collects** news from RSS feeds, Reddit, GitHub Trending, and other sources
 2. **Scores** each item 0–100 using pure-Python heuristics (engagement, authority, recency)
-3. **Generates** creator-ready content (reports, threads, newsletters, scripts) via a local LLM
+3. **Generates** creator-ready content (reports, threads, newsletters, scripts) via DeepSeek API or local Ollama
 4. **Delivers** content through a Telegram bot and a FastAPI HTTP server
-5. **Pushes** top stories to TrendPost for scheduled auto-posting
 
 The pipeline is orchestrated by a **LangGraph `StateGraph`**. All nodes are `async def` functions that receive the shared `KyvraState` TypedDict and return only the keys they modify — LangGraph merges the diff automatically.
 
@@ -52,6 +50,10 @@ kyvra-agentic/
 ├── config.py                  # All env vars + typed constants
 ├── requirements.txt
 ├── .env.example
+├── Dockerfile                 # Docker image (Python 3.11 + ffmpeg)
+├── docker-compose.yml         # Full Ollama stack
+├── docker-compose.deepseek.yml# API-only stack (no GPU needed)
+├── setup.sh                   # Interactive self-host wizard
 │
 ├── agents/
 │   ├── state.py               # KyvraState TypedDict + empty_state()
@@ -63,7 +65,7 @@ kyvra-agentic/
 │   ├── analyst.py             # Standalone AnalystAgent (legacy)
 │   ├── data_collector.py      # DataCollectorAgent (legacy)
 │   ├── narrative_scout.py     # NarrativeScoutAgent (legacy)
-│   ├── content_writer.py      # ContentWriterAgent (legacy)
+│   ├── content_writer.py      # ContentWriterAgent (legacy) + chat_with_llm()
 │   └── nodes/
 │       ├── collect.py         # collect_node
 │       ├── analyst.py         # analyst_node
@@ -91,11 +93,11 @@ kyvra-agentic/
 │   └── telegram/
 │       ├── handlers.py        # All command + message handlers
 │       ├── formatter.py       # Chunking + formatting helpers
-│       └── scheduler.py       # APScheduler daily cron
+│       └── scheduler.py       # APScheduler daily combined digest
 │
 ├── services/
 │   ├── llm.py                 # Ollama client (complete + chat modes)
-│   ├── llm_provider.py        # Provider abstraction (Ollama / DeepSeek routing)
+│   ├── llm_provider.py        # Provider abstraction (DeepSeek / Ollama / Claude)
 │   └── memory.py              # SQLite: seen items + voice profiles
 │
 ├── utils/
@@ -104,8 +106,7 @@ kyvra-agentic/
 └── tests/
     ├── test_analyst.py
     ├── test_data_collector.py
-    ├── test_memory.py
-    └── test_scheduler_push.py
+    └── test_memory.py
 ```
 
 ---
@@ -120,25 +121,35 @@ All configuration lives in `config.py`, which reads from environment variables (
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | str | From [@BotFather](https://t.me/BotFather) |
 | `REPORT_CHAT_IDS` | str | Comma-separated Telegram chat IDs for daily auto-report |
-| `ACTIVE_MODULE` | str | Active module slug, default `tech` |
-| `OLLAMA_BASE_URL` | str | Ollama server URL, default `http://localhost:11434` |
-| `OLLAMA_MODEL` | str | Model name, default `gemma3` |
+| `DEEPSEEK_API_KEY` | str | From [platform.deepseek.com](https://platform.deepseek.com) — used for content + captions |
 
-### Optional
+### LLM provider
 
-| Variable | Type | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `DEEPSEEK_API_KEY` | str | Required for `/caption` |
-| `DEEPSEEK_MODEL` | str | Default `deepseek-chat` |
-| `REPORT_TIME` | str | HH:MM for daily report, default `08:00` |
-| `TIMEZONE` | str | Scheduler timezone, default `Asia/Ho_Chi_Minh` |
-| `XAI_API_KEY` | str | Grok API key (alternate LLM backend) |
-| `X_BEARER_TOKEN` | str | Twitter API v2 bearer token |
-| `NEWS_API_KEY` | str | newsapi.org key |
-| `PRODUCT_HUNT_API_KEY` | str | Product Hunt API key |
-| `TRENDPOST_WEBHOOK_URL` | str | Outgoing webhook for story push |
-| `TRENDPOST_WEBHOOK_SECRET` | str | HMAC-SHA256 shared secret |
-| `TRENDPOST_API_URL` | str | Base URL for `/link` and STOP handler |
+| `CONTENT_LLM_PROVIDER` | `deepseek` | `deepseek` \| `ollama` \| `claude` |
+| `CAPTION_LLM_PROVIDER` | `deepseek` | Same options |
+| `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek model name |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Only if using Ollama |
+| `OLLAMA_MODEL` | `gemma3` | Only if using Ollama |
+| `ANTHROPIC_API_KEY` | — | Only if using Claude |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Only if using Claude |
+
+### Module & schedule
+
+| Variable | Default | Description |
+|---|---|---|
+| `ACTIVE_MODULE` | `crypto` | Active module slug |
+| `REPORT_TIME` | `08:00` | HH:MM for daily digest |
+| `TIMEZONE` | `Asia/Ho_Chi_Minh` | Scheduler timezone |
+
+### Optional data sources
+
+| Variable | Description |
+|---|---|
+| `X_BEARER_TOKEN` | Twitter API v2 bearer — improves signal quality |
+| `NEWS_API_KEY` | newsapi.org key |
+| `PRODUCT_HUNT_API_KEY` | Product Hunt API key |
 
 ---
 
@@ -155,16 +166,16 @@ All configuration lives in `config.py`, which reads from environment variables (
          "empty"            "score"
            │                   │
           END       ┌──────────┴──────────┐
-                [analyst]            [scout]    ← parallel, no dependency
+                [analyst]            [scout]    ← parallel, no LLM
                   └──────────┬──────────┘
                              │
                        after_parallel()
                       /               \
                "quick_end"          "write"
                    │                   │
-                  END             [writer]      ← LLM call
+                  END             [writer]      ← LLM call (DeepSeek or Ollama)
                                       │
-                               [publisher]      ← mark_seen + TrendPost push
+                               [publisher]      ← mark_seen (story continuity)
                                       │
                                      END
 ```
@@ -311,15 +322,11 @@ Returns `{"report_text": generated_text, "errors": updated_errors}`.
 
 ### `publisher_node` (`agents/nodes/publisher.py`)
 
-**Responsibility:** Mark delivered stories as seen and push to TrendPost webhook.
+**Responsibility:** Mark delivered stories as seen in SQLite (story continuity).
 
 **Algorithm:**
 1. For each item in `top_items`: call `memory.mark_seen(url)` (SQLite)
-2. If `TRENDPOST_WEBHOOK_URL` is set:
-   - Serialize `top_items` to JSON
-   - Sign with `HMAC-SHA256(TRENDPOST_WEBHOOK_SECRET, body)`
-   - `POST` to webhook URL with header `x-kyvra-signature: sha256=<digest>`
-3. Gracefully handles missing config and network errors without raising
+2. Items marked seen are suppressed from future reports unless they are spikes recirculated within 48h
 
 Returns `{"published": True}`.
 
@@ -337,7 +344,7 @@ def after_parallel(state: KyvraState) -> str:
 
 ## 7. GraphRunner – Public API
 
-`GraphRunner` (`agents/graph_runner.py`) wraps `kyvra_graph` and exposes a clean interface to handlers and the API server. It is initialized with a module name: `GraphRunner("tech")`.
+`GraphRunner` (`agents/graph_runner.py`) wraps `kyvra_graph` and exposes a clean interface to handlers and the API server. It is initialized with a module name: `GraphRunner("crypto")`.
 
 ### Methods
 
@@ -368,11 +375,11 @@ async for event in runner.stream_events("full"):
 
 ```python
 {
-    "module": "tech",
+    "module": "crypto",
     "items_fetched": 42,
     "top_score": 94,
     "spike_count": 3,
-    "sources_ok": ["github", "rss_anthropic", "reddit_ml"],
+    "sources_ok": ["github", "rss_coindesk", "reddit_crypto"],
     "sources_error": [],
     "last_run_at": "2026-06-05T08:00:00+07:00",
 }
@@ -394,11 +401,11 @@ class BaseModule(ABC):
 
     @property
     @abstractmethod
-    def sources(self) -> list[DataSource]: ...  # list of DataSource instances
+    def sources(self) -> list[DataSource]: ...
 
     @property
     @abstractmethod
-    def keywords(self) -> list[str]: ...     # relevance filter keywords
+    def keywords(self) -> list[str]: ...
 
     @property
     @abstractmethod
@@ -412,7 +419,7 @@ class BaseModule(ABC):
     @abstractmethod
     def spike_threshold_x(self) -> int: ...
 
-    def get_prompt_builder(self, fmt: str) -> PromptBuilder: ...  # returns module's prompt
+    def get_prompt_builder(self, fmt: str) -> PromptBuilder: ...
 ```
 
 ### DataSource (`modules/base.py`)
@@ -457,33 +464,26 @@ All imports are deferred inside `load_module()` for Python 3.9 compatibility and
 
 ### Adding a module
 
-See [Section 16](#16-adding-a-new-module).
+See [Section 15](#15-adding-a-new-module).
 
 ---
 
 ## 9. Services
 
-### `services/llm.py` — Ollama client
-
-Low-level async client for the Ollama HTTP API.
-
-```python
-async def complete(prompt: str, model: str = OLLAMA_MODEL) -> str: ...
-async def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str: ...
-```
-
-Uses `httpx.AsyncClient` with a 120s timeout. Raises `httpx.HTTPError` on failure.
-
 ### `services/llm_provider.py` — Provider abstraction
 
-Selects the right backend based on config and the requested task.
+Selects the right backend based on `CONTENT_LLM_PROVIDER` / `CAPTION_LLM_PROVIDER` env vars.
 
 ```python
 def get_content_provider() -> LLMProvider:
-    # Returns OllamaProvider (default) or XAIProvider if XAI_API_KEY is set
+    # deepseek → DeepSeekProvider
+    # ollama   → OllamaProvider
+    # claude   → ClaudeProvider
 
 def get_caption_provider() -> LLMProvider:
-    # Always returns DeepSeekProvider (uses DEEPSEEK_API_KEY)
+    # deepseek → DeepSeekProvider (default)
+    # ollama   → OllamaProvider
+    # claude   → ClaudeProvider
 ```
 
 Each provider implements:
@@ -494,9 +494,20 @@ class LLMProvider(ABC):
     async def chat(self, messages: list[dict], ...) -> str: ...
 ```
 
+### `services/llm.py` — Ollama client
+
+Low-level async client for the Ollama HTTP API. Used by `OllamaProvider`.
+
+```python
+async def complete(prompt: str, model: str = OLLAMA_MODEL) -> str: ...
+async def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str: ...
+```
+
+Uses `httpx.AsyncClient` with a 120s timeout.
+
 ### `services/memory.py` — SQLite persistence
 
-Backed by `~/.kyvra/memory.db` (or path from env). Two tables:
+Backed by `~/.kyvra/memory.db`. Created automatically on first run.
 
 **`seen_items`** — story continuity dedup
 
@@ -515,7 +526,7 @@ async def get_voice(chat_id: int) -> str | None: ...
 
 ### `utils/cache.py` — TTL cache
 
-Simple in-memory dict cache with per-key TTL. Used by `GraphRunner.get_status()` (2h TTL) and source fetch dedup.
+Simple in-memory dict cache with per-key TTL. Used by `GraphRunner.get_status()` (2h TTL).
 
 ```python
 cache = TTLCache()
@@ -541,8 +552,7 @@ After `/report`, each story gets a `🐦 Tweet #N` button. `handle_tweet_callbac
 
 **Plain-text message handler**
 
-- URL matching a supported video domain → `handle_video_link()` → caption pipeline
-- `"STOP"` (case-insensitive) → `handle_stop_message()` → TrendPost STOP webhook
+URL matching a supported video domain → `handle_video_link()` → caption pipeline.
 
 **`AVAILABLE_MODULES`**
 
@@ -550,30 +560,41 @@ Defined at the top of `handlers.py`. Must be kept in sync with `agents/registry.
 
 ### Scheduler (`interfaces/telegram/scheduler.py`)
 
-Uses `APScheduler AsyncIOScheduler`. A single daily job runs `generate_report()` for each chat ID in `REPORT_CHAT_IDS` at `REPORT_TIME` in `TIMEZONE`.
+Uses `APScheduler AsyncIOScheduler`. One daily job runs `_send_combined_digest()` at `REPORT_TIME` in `TIMEZONE`.
+
+`_send_combined_digest()` runs a `quick_scan()` (no LLM) for every module in `_ALL_MODULES`, assembles the top 2 stories per module into a single combined digest message, and sends it to all chat IDs in `REPORT_CHAT_IDS`.
 
 ### FastAPI (`interfaces/web/app.py` + `api_server.py`)
 
-`api_server.py` exports `create_app() -> FastAPI`. Called by `main.py` to mount the API on port 8000 alongside the bot.
+`api_server.py` exports the FastAPI `app`. Runs on port `8000`.
 
 **Endpoints:**
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/generate` | Run the full pipeline; body: `{module, mode, topic?, format?, rank?}` |
-| `GET` | `/status` | Returns `GraphRunner.get_status()` for the active module |
-| `POST` | `/webhook/stop` | Receives STOP signal from TrendPost UI |
+| `GET` | `/health` | Liveness check |
+| `GET` | `/report?module=crypto` | Full AI daily report |
+| `GET` | `/update?module=crypto` | Fast scan (no LLM) |
+| `GET` | `/breaking?module=crypto` | Spike items only |
+| `GET` | `/topic?module=crypto&q=bitcoin` | Topic-scoped AI report |
+| `GET` | `/brief?module=crypto` | 3-bullet shareable brief |
+| `GET` | `/thread?module=crypto` | 7-tweet Twitter thread |
+| `GET` | `/newsletter?module=crypto` | Newsletter section |
+| `GET` | `/script?module=crypto` | TikTok/Reels script |
+| `GET` | `/status?module=crypto` | Source health & item counts |
+| `POST` | `/chat` | Multi-turn chat with the module persona |
+| `POST` | `/voice` | Save a voice profile for an API user |
+| `GET` | `/voice/{user_id}` | Retrieve current voice profile |
 
-Request/response bodies are Pydantic models. The `/generate` endpoint streams node events via `StreamingResponse` if `stream=true` is in the body.
+Auth: Bearer token via `Authorization` header (`API_KEY` env var). If `API_KEY` is unset, the server starts in open mode (dev only).
 
 ### Formatter (`interfaces/telegram/formatter.py`)
 
 ```python
-async def send_long_message(bot, chat_id, text, parse_mode="HTML") -> None:
-    # splits at 4096 chars on paragraph boundaries
+def split_long_message(text: str, max_len: int = 4000) -> list[str]: ...
+def format_update(items: list[ScoredItem]) -> str: ...
+def format_breaking(items: list[ScoredItem]) -> str: ...
 ```
-
-Also provides `format_report_html()` which wraps story sections in Telegram-safe HTML.
 
 ---
 
@@ -592,7 +613,7 @@ score = engagement_score(item)     # 0-40
 
 All scorer functions are exported from `agents/nodes/analyst.py` for unit test access.
 
-### ScoredItem (legacy, `agents/base.py`)
+### ScoredItem (`agents/base.py`)
 
 ```python
 @dataclass
@@ -608,60 +629,11 @@ class ScoredItem:
     cross_source_count: int
 ```
 
-In the LangGraph pipeline, `scored_items` and `top_items` in `KyvraState` hold `ScoredItem` instances (same dataclass, reused).
+In the LangGraph pipeline, `scored_items` and `top_items` in `KyvraState` hold `ScoredItem` instances.
 
 ---
 
-## 12. TrendPost Integration
-
-### Story push (outgoing)
-
-Triggered by `publisher_node` at the end of every full pipeline run.
-
-```
-POST TRENDPOST_WEBHOOK_URL
-Headers:
-  Content-Type: application/json
-  x-kyvra-signature: sha256=<hmac-sha256(secret, body_bytes)>
-Body:
-{
-  "stories": [{ "title", "url", "summary", "confidence_score", "source" }, ...],
-  "module": "tech",
-  "pushed_date": "2026-06-05"
-}
-```
-
-Skipped silently if `TRENDPOST_WEBHOOK_URL` is not set.
-
-### `/link` flow
-
-```
-User: /link
-  │
-  ▼
-cmd_link():
-  1. Generate random 6-digit code (expires 5 min)
-  2. POST TRENDPOST_API_URL/api/webhooks/kyvra-link  (HMAC-signed)
-     Body: { telegram_chat_id, code }
-  3. Reply: "Your code: 123456 — enter it in TrendPost"
-```
-
-### STOP handler
-
-```
-User sends "STOP"
-  │
-  ▼
-handle_stop_message():
-  POST TRENDPOST_API_URL/api/webhooks/kyvra-stop  (HMAC-signed)
-  Body: { telegram_chat_id }
-```
-
-TrendPost cancels the latest `pending_approval` schedule for that chat ID.
-
----
-
-## 13. Video / Caption Pipeline
+## 12. Video / Caption Pipeline
 
 ### Trigger
 
@@ -698,7 +670,7 @@ Cleanup: /tmp/kyvra_video/<uuid>/ deleted after send
 
 ---
 
-## 14. Memory & Persistence
+## 13. Memory & Persistence
 
 ### SQLite database
 
@@ -725,7 +697,7 @@ Story continuity logic in `collect_node`: an item whose URL is in `seen_items` i
 
 ---
 
-## 15. Testing
+## 14. Testing
 
 ```bash
 pytest                          # run all tests
@@ -740,13 +712,12 @@ pytest -v -k "spike"           # filter by name
 | `test_analyst.py` | Confidence scoring functions, spike detection, edge cases |
 | `test_data_collector.py` | Source fetch mocking, dedup logic, keyword filter |
 | `test_memory.py` | SQLite mark_seen / is_seen / voice profiles |
-| `test_scheduler_push.py` | TrendPost webhook signing, HMAC verification |
 
-All tests use `pytest-asyncio` for async test functions. External HTTP calls are mocked with `unittest.mock.AsyncMock`. No real Ollama or DeepSeek calls in tests.
+All tests use `pytest-asyncio` for async test functions. External HTTP calls are mocked with `unittest.mock.AsyncMock`. No real DeepSeek or Ollama calls in tests.
 
 ---
 
-## 16. Adding a New Module
+## 15. Adding a New Module
 
 ### Step 1 — Create the module directory
 
@@ -823,39 +794,41 @@ Or at runtime: `/module mymodule` in Telegram.
 
 ---
 
-## 17. Deployment
+## 16. Deployment
+
+### Docker (recommended for self-hosters)
+
+```bash
+# DeepSeek — no GPU needed
+docker compose -f docker-compose.deepseek.yml up -d
+
+# Ollama — local inference
+docker compose up -d
+```
+
+Or use the interactive wizard:
+
+```bash
+bash setup.sh
+```
+
+### VPS / systemd
+
+```bash
+git clone https://github.com/kyvra-tech/kyvra-agentic.git /opt/kyvra-agentic
+cd /opt/kyvra-agentic
+cp .env.example .env && nano .env
+
+sudo cp kyvra-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kyvra-bot
+```
 
 ### Process model
 
 `main.py` starts two concurrent tasks in a single asyncio event loop:
 1. **python-telegram-bot** `Application.run_polling()` — handles Telegram updates
 2. **uvicorn** running the FastAPI app on `:8000`
-
-### systemd service
-
-```ini
-# kyvra-bot.service
-[Unit]
-Description=Kyvra Agentic Bot
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/kyvra-agentic
-EnvironmentFile=/opt/kyvra-agentic/.env
-ExecStart=/opt/kyvra-agentic/venv/bin/python main.py
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo cp kyvra-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable kyvra-bot
-sudo systemctl start kyvra-bot
-```
 
 ### CI/CD (`.github/workflows/deploy.yml`)
 
@@ -866,26 +839,18 @@ On push to `main`:
 4. Write `.env` from GitHub Actions secrets
 5. `sudo systemctl restart kyvra-bot`
 
-### Ollama (required on server)
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull gemma3
-ollama serve    # or manage as a separate systemd service
-```
-
 ---
 
-## 18. Known Constraints
+## 17. Known Constraints
 
 | Constraint | Detail |
 |---|---|
-| Ollama must be running | Bot will start but all LLM calls will fail with connection error if Ollama is not serving |
-| `REPORT_CHAT_IDS` required | Daily auto-report silently skips if not set |
+| `DEEPSEEK_API_KEY` required | All content generation and `/caption` silently fail without it |
+| `REPORT_CHAT_IDS` required | Daily digest silently skips if not set |
+| Ollama optional | Only needed if `CONTENT_LLM_PROVIDER=ollama`; must be running before bot start |
 | Video files > 50 MB | Not sent to Telegram; caption still generated |
 | python-telegram-bot v21 | All handlers **must** be `async def`; mixing sync handlers causes silent failures |
 | Single-process model | Bot and API server share one asyncio loop; a blocking call in any handler stalls the whole process |
-| SQLite concurrency | `memory.py` uses `aiosqlite`; safe for single-process use, not multi-process |
-| `TRENDPOST_*` vars optional | All TrendPost features silently no-op if vars are missing — no error raised |
+| SQLite concurrency | `memory.py` uses `aiosqlite`; safe for single-process, not multi-process |
 | yt-dlp rate limits | YouTube/Instagram may throttle; downloads go to `/tmp/kyvra_video/` and are deleted after send |
 | Status cache TTL | `get_status()` caches for 2 hours per module; `/status` may show stale data after a module switch |
