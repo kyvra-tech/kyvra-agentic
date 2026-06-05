@@ -20,7 +20,7 @@ Graph shape
                  │                  │
                 END             [writer]       ← LLM call
                                    │
-                              [publisher]      ← mark_seen + TrendPost push
+                              [publisher]      ← mark_seen (story continuity)
                                    │
                                   END
 

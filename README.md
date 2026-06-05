@@ -2,6 +2,13 @@
 
 Modular, multi-agent Telegram bot that monitors news across 11 niches daily and generates reports, content angles, and creator-ready formats for social media.
 
+**Free and open-source. Self-host in 60 seconds.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/kyvra-tech/kyvra-agentic)](https://github.com/kyvra-tech/kyvra-agentic/stargazers)
+
+> If Kyvra saves you time, consider [sponsoring the project](https://github.com/sponsors/kyvra-tech) or sending a tip in crypto — wallet address at the bottom of this page.
+
 ---
 
 ## What it does
@@ -14,7 +21,6 @@ Modular, multi-agent Telegram bot that monitors news across 11 niches daily and 
 - **Creator Formats** – every report can be turned into a Twitter thread, newsletter section, TikTok script, or 3-bullet brief
 - **Video Captions** – paste any YouTube/TikTok/Instagram URL to get AI-generated captions for 3 platforms
 - **Multi-Module** – switch between 11 topic niches: tech, crypto, vietnam, indie, parody, sport, political, war, humor, energy, markets
-- **TrendPost Integration** – push stories to TrendPost for scheduled auto-posting
 
 ---
 
@@ -40,7 +46,7 @@ The pipeline is built on **LangGraph** (`StateGraph`). Each node is an `async de
                  │                  │
                 END             [writer]       ← LLM call (Ollama)
                                    │
-                              [publisher]      ← mark_seen + TrendPost push
+                              [publisher]      ← mark_seen (story continuity)
                                    │
                                   END
 ```
@@ -105,7 +111,6 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 | `/setvoice [description]` | Save personal writing style for all content |
 | `/module [name]` | Switch active module (tech, crypto, vietnam, …) |
 | `/caption [url]` | Download media + generate captions (or just paste a URL) |
-| `/link` | Generate a code to link with TrendPost auto-post |
 
 ---
 
@@ -152,7 +157,7 @@ kyvra-agentic/
 │       ├── analyst.py         # Confidence scoring + spike detection
 │       ├── scout.py           # Trend heatmap builder
 │       ├── writer.py          # LLM report/content generation
-│       ├── publisher.py       # mark_seen + TrendPost webhook push
+│       ├── publisher.py       # mark_seen (story continuity)
 │       └── router.py          # Conditional edge functions (after_collect, after_parallel)
 │
 ├── modules/                   # Niche plugins – swap to change domain
@@ -186,73 +191,108 @@ kyvra-agentic/
 
 ---
 
-## Setup
+## Self-Host in 60 Seconds
 
-### Local development
+### Requirements
+
+- [Docker Desktop](https://docs.docker.com/get-docker/) (Mac / Windows / Linux)
+- A Telegram bot token — create one free at [@BotFather](https://t.me/BotFather)
+- A DeepSeek API key — free tier at [platform.deepseek.com](https://platform.deepseek.com) (~$0.001/report)
+
+### Quickstart
 
 ```bash
-# 1. Start Ollama with Gemma 3
-ollama pull gemma3
-ollama serve
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Install pre-commit hooks (blocks commits containing secrets)
-pip install pre-commit detect-secrets
-pre-commit install
-
-# 4. Configure environment
-cp .env.example .env
-# Edit .env – fill in required vars (see below)
-
-# 5. Run
-python main.py
-
-# Run the pipeline once and print to stdout (no bot, no scheduler)
-python main.py --once
+git clone https://github.com/kyvra-tech/kyvra-agentic.git
+cd kyvra-agentic
+bash setup.sh
 ```
 
-### Required env vars
+The setup script walks you through config, pulls the right Docker images, and starts the bot. Open Telegram and send `/start` to your bot when it's done.
 
-| Variable | Description |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token (from [@BotFather](https://t.me/BotFather)) |
-| `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs for auto-report |
-| `REPORT_TIME` | Daily report time, HH:MM format (default: `08:00`) |
-| `TIMEZONE` | Timezone for scheduler (default: `Asia/Ho_Chi_Minh`) |
-| `ACTIVE_MODULE` | Active module slug (default: `tech`) |
-| `OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`) |
-| `OLLAMA_MODEL` | Ollama model name (default: `gemma3`) |
-| `DEEPSEEK_API_KEY` | DeepSeek API key – required for `/caption` |
+### Manual setup (if you prefer)
 
-### Optional env vars
-
-| Variable | Description |
-|---|---|
-| `DEEPSEEK_MODEL` | DeepSeek model (default: `deepseek-chat`) |
-| `XAI_API_KEY` | Grok API key (if using xAI as LLM backend) |
-| `X_BEARER_TOKEN` | Twitter API v2 bearer token |
-| `NEWS_API_KEY` | newsapi.org key |
-| `PRODUCT_HUNT_API_KEY` | Product Hunt API key |
-| `TRENDPOST_WEBHOOK_URL` | TrendPost story push endpoint |
-| `TRENDPOST_WEBHOOK_SECRET` | HMAC secret shared with TrendPost |
-| `TRENDPOST_API_URL` | TrendPost API base URL (for `/link` and STOP handler) |
-
-### Production deployment (GitHub Actions → server)
-
-Secrets are stored in **GitHub → Settings → Secrets and variables → Actions** — never in code.
-
-On every push to `main`:
-1. GitHub Actions runs `detect-secrets` — commit is blocked if any secret is found
-2. If clean, the workflow SSHs into the server, writes `.env` from secrets, and restarts the bot via systemd
-
-**First-time server setup:**
 ```bash
+# 1. Clone and configure
+git clone https://github.com/kyvra-tech/kyvra-agentic.git
+cd kyvra-agentic
+cp .env.example .env
+# Edit .env — fill in TELEGRAM_BOT_TOKEN, REPORT_CHAT_IDS, DEEPSEEK_API_KEY
+
+# 2a. Start with DeepSeek (no GPU needed — recommended)
+docker compose -f docker-compose.deepseek.yml up -d
+
+# 2b. Or start with local Ollama (free, needs a decent machine)
+docker compose up -d
+# First run pulls gemma3 (~5 GB) — give it a few minutes
+```
+
+### Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### Environment variables
+
+**Required:**
+
+| Variable | Description |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
+| `REPORT_CHAT_IDS` | Your Telegram chat ID — find it with [@userinfobot](https://t.me/userinfobot) |
+| `DEEPSEEK_API_KEY` | From [platform.deepseek.com](https://platform.deepseek.com) |
+
+**LLM provider (pick one):**
+
+| Variable | Default | Description |
+|---|---|---|
+| `CONTENT_LLM_PROVIDER` | `deepseek` | `deepseek` \| `ollama` \| `claude` |
+| `CAPTION_LLM_PROVIDER` | `deepseek` | Same options |
+| `OLLAMA_BASE_URL` | `http://ollama:11434` | Only if using Ollama |
+| `OLLAMA_MODEL` | `gemma3` | Only if using Ollama |
+| `ANTHROPIC_API_KEY` | — | Only if using Claude |
+
+**Optional:**
+
+| Variable | Description |
+|---|---|
+| `ACTIVE_MODULE` | Default module: `crypto` \| `tech` \| `vietnam` \| … (default: `crypto`) |
+| `REPORT_TIME` | Daily report time HH:MM (default: `08:00`) |
+| `TIMEZONE` | Scheduler timezone (default: `Asia/Ho_Chi_Minh`) |
+| `X_BEARER_TOKEN` | Twitter API bearer — improves signal quality |
+| `NEWS_API_KEY` | [newsapi.org](https://newsapi.org) key |
+
+### VPS / server deployment (systemd)
+
+```bash
+# On your server
+git clone https://github.com/kyvra-tech/kyvra-agentic.git /opt/kyvra-agentic
+cd /opt/kyvra-agentic
+cp .env.example .env && nano .env
+
 sudo cp kyvra-bot.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable kyvra-bot
-sudo systemctl start kyvra-bot
+sudo systemctl enable --now kyvra-bot
+```
+
+CI/CD via GitHub Actions is also supported — see `.github/workflows/deploy.yml`.
+
+### Local development (no Docker)
+
+```bash
+# 1. Start Ollama
+ollama pull gemma3 && ollama serve
+
+# 2. Install deps
+pip install -r requirements.txt
+
+# 3. Configure and run
+cp .env.example .env  # fill in vars
+python main.py
+
+# Run pipeline once, print to stdout
+python main.py --once
 ```
 
 ---
@@ -280,5 +320,33 @@ See [ROADMAP.md](ROADMAP.md) for the full plan.
 | 2 – More Sources | Reddit, TLDR Tech RSS, Product Hunt | ✅ Done |
 | 3 – New Modules + Creator Formats | Crypto, Vietnam, Indie + `/thread` `/newsletter` `/script` `/brief` | ✅ Done |
 | 4 – LangGraph Migration | StateGraph pipeline, parallel nodes, typed state | ✅ Done |
-| 5 – Memory & Personalization | Voice profiles, seen-item suppression, topic subscriptions | 🔜 Next |
-| 6 – Autonomous Mode | Breaking news push alerts, self-scheduling | Q3 |
+| 5 – Self-Host + Docker | One-command setup, open-source distribution | ✅ Done |
+| 6 – Memory & Personalization | Voice profiles, seen-item suppression, topic subscriptions | 🔜 Next |
+| 7 – Autonomous Mode | Breaking news push alerts, self-scheduling | Q3 |
+
+---
+
+## Contributing
+
+Pull requests are welcome. For major changes, open an issue first.
+
+```bash
+# Run tests
+pytest
+
+# Run a single test
+pytest tests/test_analyst.py -v
+```
+
+---
+
+## Support the project
+
+Kyvra is free and open-source. If it saves you time, consider supporting development:
+
+- **GitHub Sponsors:** [github.com/sponsors/kyvra-tech](https://github.com/sponsors/kyvra-tech)
+- **Bitcoin:** `bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`
+- **Ethereum / USDC:** `0x71C7656EC7ab88b098defB751B7401B5f6d8976F`
+- **Star the repo** — it helps more people find the project
+
+Built with love for crypto creators.

@@ -8,7 +8,7 @@ from interfaces.telegram.handlers import (
     cmd_start, cmd_help, cmd_report, cmd_chat, error_handler,
     cmd_update, cmd_breaking, cmd_topic, cmd_module, cmd_thread, cmd_brief,
     cmd_status, cmd_newsletter, cmd_script, cmd_setvoice,
-    cmd_link, handle_stop_message, cmd_caption, handle_video_link,
+    cmd_caption, handle_video_link,
     handle_tweet_callback,
 )
 from interfaces.telegram.scheduler import setup_scheduler
@@ -56,7 +56,6 @@ def main() -> None:
     app.add_handler(CommandHandler("chat",       cmd_chat))
     app.add_handler(CommandHandler("setvoice",   cmd_setvoice))
     app.add_handler(CommandHandler("module",     cmd_module))
-    app.add_handler(CommandHandler("link",       cmd_link))
     app.add_handler(CommandHandler("caption",    cmd_caption))
 
     # Inline button callbacks

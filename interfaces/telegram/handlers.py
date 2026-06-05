@@ -1,21 +1,14 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
 import logging
-import random
-import string
-from datetime import datetime, timedelta, timezone
 
-import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from agents.graph_runner import GraphRunner
 from agents.registry import load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
-from config import ACTIVE_MODULE, TRENDPOST_API_URL, TRENDPOST_WEBHOOK_SECRET
+from config import ACTIVE_MODULE
 import services.memory as memory
 
 logger = logging.getLogger(__name__)
@@ -119,7 +112,6 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
         "🧩 */module \\[name\\]* – Switch focus module\n"
         "   tech \\| crypto \\| vietnam \\| indie \\| parody \\| sport \\| political \\| war\n"
-        "🔗 */link* – Link Telegram to TrendPost (enables auto-post)\n\n"
 
         "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )
@@ -481,102 +473,6 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "All content formats (/thread, /brief, /newsletter, /script) will now use your voice.",
     )
 
-
-async def _post_to_trendpost(path: str, payload: dict, timeout: int = 5) -> dict | None:
-    """
-    Sign and POST a payload to creator-backend via HMAC-SHA256.
-    Returns parsed JSON response dict, or None on network/HTTP error.
-    Caller is responsible for checking response content.
-    """
-    body = json.dumps(payload, separators=(",", ":"))
-    sig = "sha256=" + hmac.new(
-        TRENDPOST_WEBHOOK_SECRET.encode(),
-        body.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{TRENDPOST_API_URL}{path}",
-                content=body,
-                headers={"Content-Type": "application/json", "x-kyvra-signature": sig},
-            )
-        return {"status_code": resp.status_code, "data": resp.json() if resp.text else {}}
-    except Exception as e:
-        logger.error(f"_post_to_trendpost {path}: request failed: {e}")
-        return None
-
-
-async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/link — generate a one-time 6-digit code to link this Telegram account to TrendPost web app."""
-    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
-        await update.message.reply_text(
-            "⚠️ TrendPost integration is not configured. Contact support."
-        )
-        return
-
-    chat_id = str(update.effective_chat.id)
-    code = "".join(random.choices(string.digits, k=6))
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
-
-    # Store the code in TrendPost so the web UI can verify it
-    result = await _post_to_trendpost(
-        "/api/webhooks/kyvra-link",
-        {"telegram_chat_id": chat_id, "code": code, "expires_at": expires_at},
-    )
-    if result is None or result["status_code"] not in (200, 201):
-        status = result["status_code"] if result else "unreachable"
-        logger.error(f"cmd_link: TrendPost returned {status}")
-        await update.message.reply_text(
-            "❌ Could not generate link code. Please try again in a moment."
-        )
-        return
-
-    await update.message.reply_text(
-        f"🔗 *Link your TrendPost account*\n\n"
-        f"Enter this code in TrendPost → Settings → Telegram:\n\n"
-        f"```\n{code}\n```\n\n"
-        f"Code expires in *5 minutes*. Run /link again if it expires.",
-        parse_mode="Markdown",
-    )
-    logger.info(f"cmd_link: code generated for chat_id={chat_id}")
-
-
-async def handle_stop_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Plain-text message handler for 'STOP' (case-insensitive).
-    Cancels the most recent pending_approval auto-post for this Telegram chat.
-    """
-    if not update.message or not update.message.text:
-        return
-
-    text = update.message.text.strip().upper()
-    if text != "STOP":
-        return
-
-    if not TRENDPOST_API_URL or not TRENDPOST_WEBHOOK_SECRET:
-        return
-
-    chat_id = str(update.effective_chat.id)
-    logger.info(f"handle_stop_message: STOP received from chat_id={chat_id}")
-
-    result = await _post_to_trendpost("/api/webhooks/kyvra-stop", {"telegram_chat_id": chat_id})
-
-    if result is None:
-        await update.message.reply_text(
-            "⚠️ Could not reach TrendPost to cancel. Please check the app directly."
-        )
-    elif result["status_code"] == 200:
-        await update.message.reply_text("✅ Got it — today's auto-post has been cancelled.")
-    elif result["status_code"] == 404:
-        await update.message.reply_text("ℹ️ No pending auto-post found to cancel.")
-    elif result["status_code"] == 409:
-        await update.message.reply_text("ℹ️ The post has already been sent or was already cancelled.")
-    else:
-        logger.warning(f"handle_stop_message: unexpected status {result['status_code']}")
-        await update.message.reply_text(
-            "⚠️ Could not cancel the post. Please check TrendPost directly."
-        )
 
 
 async def cmd_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
