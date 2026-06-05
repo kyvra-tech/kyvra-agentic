@@ -1,6 +1,6 @@
 # Kyvra Agentic – AI Content Agent
 
-Modular, multi-agent Telegram bot that monitors Tech/AI/Indie Dev news daily and generates reports with content angles for creators.
+Modular, multi-agent Telegram bot that monitors news across 11 niches daily and generates reports, content angles, and creator-ready formats for social media.
 
 ---
 
@@ -8,29 +8,46 @@ Modular, multi-agent Telegram bot that monitors Tech/AI/Indie Dev news daily and
 
 - **Daily Morning Report** – auto-sent at 8:00 AM (GMT+7) every day
 - **Fast Scan** – `/update` returns top scored items in ~10 sec, no LLM cost
-- **Breaking Alerts** – `/breaking` shows only spike items (viral X tweets, HN front page)
+- **Breaking Alerts** – `/breaking` shows only spike items (viral/trending signals)
 - **Topic Report** – `/topic [keyword]` scopes the full AI report to one topic
-- **AI Chat** – `/chat` lets you ask anything about tech/AI news with conversation history
-- **Content Angles** – every insight comes with a suggested Twitter thread, TikTok, or newsletter angle
+- **AI Chat** – `/chat` lets you ask anything about today's news
+- **Creator Formats** – every report can be turned into a Twitter thread, newsletter section, TikTok script, or 3-bullet brief
+- **Video Captions** – paste any YouTube/TikTok/Instagram URL to get AI-generated captions for 3 platforms
+- **Multi-Module** – switch between 11 topic niches: tech, crypto, vietnam, indie, parody, sport, political, war, humor, energy, markets
+- **TrendPost Integration** – push stories to TrendPost for scheduled auto-posting
 
 ---
 
 ## Architecture
 
+The pipeline is built on **LangGraph** (`StateGraph`). Each node is an `async def` that returns only the keys it modifies; LangGraph merges them into a shared `KyvraState` TypedDict.
+
 ```
- Telegram  ─┐
- Discord   ─┤  (interfaces/)       SupervisorAgent
- Web API   ─┘                            │
-                              Phase 1:   DataCollectorAgent
-                                         (parallel fetch, filter, dedup)
-                              Phase 2:   AnalystAgent ─┐ (parallel)
-                                         NarrativeScout─┘
-                              Phase 3:   ContentWriterAgent (LLM)
+                    START
+                      │
+                  [collect]          ← fetch, filter, dedup, story continuity
+                      │
+           ┌──after_collect──┐
+         "empty"          "score"
+           │                 │
+          END     ┌──────────┴──────────┐
+                [analyst]           [scout]    ← parallel (no dependency)
+                  └──────────┬──────────┘
+                             │
+                     after_parallel
+                    /              \
+             "quick_end"         "write"
+                 │                  │
+                END             [writer]       ← LLM call (Ollama)
+                                   │
+                              [publisher]      ← mark_seen + TrendPost push
+                                   │
+                                  END
 ```
 
-Each agent implements `BaseAgent.run(ctx: PipelineContext) → PipelineContext`. The pipeline core is fully decoupled from the delivery layer — adding Discord or a Web API requires zero changes to agents or modules.
+`GraphRunner` (`agents/graph_runner.py`) wraps the compiled graph and exposes a `SupervisorAgent`-compatible API to the Telegram handlers and FastAPI server.
 
-`quick_scan()` runs only Phases 1 + 2 (no LLM), used by `/update` and `/breaking` for fast, cheap responses.
+`quick_scan()` routes to `quick_end` — runs collect + analyst + scout but skips the LLM writer, keeping `/update` and `/breaking` fast and free.
 
 ---
 
@@ -59,7 +76,7 @@ Top 7 Tech Insights today:
 
 | Signal | Points |
 |---|---|
-| Engagement (GitHub stars/day, X likes) | 0 – 40 |
+| Engagement (GitHub stars/day, HN points, Reddit score) | 0 – 40 |
 | Source authority (Anthropic/OpenAI blog = 20) | 0 – 20 |
 | Recency (< 6h = 20, < 24h = 13, < 48h = 6) | 0 – 20 |
 | Relevance base (passed keyword filter) | 10 |
@@ -69,31 +86,26 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 
 ---
 
-## Data Sources (Tech Module – all free)
-
-| Source | Data |
-|---|---|
-| X – AI Leaders | Tweets from top AI accounts (pre-curated list) |
-| X – AI Trending | AI/LLM keyword search, min engagement filter |
-| X – Indie Dev | Indie maker keyword search |
-| GitHub Trending | Trending repos, stars/day |
-| Anthropic Blog RSS | New models, research, announcements |
-| OpenAI Blog RSS | Product launches, API updates |
-| Google DeepMind Blog RSS | Research papers, Gemini updates |
-
----
-
 ## Telegram Commands
 
 | Command | Description |
 |---|---|
-| `/start` | Welcome message + command list |
+| `/start` | Welcome message + quick start guide |
 | `/help` | Full command reference |
 | `/update` | Fast scan – top scored items, no AI (~10 sec) |
 | `/breaking` | Spike alerts only (viral/trending items) |
 | `/topic [keyword]` | AI report scoped to one topic, e.g. `/topic openai` |
 | `/report` | Full AI-written daily report (30–60 sec) |
-| `/chat [question]` | Chat about tech news with conversation memory |
+| `/brief [rank]` | 3-bullet shareable summary of a story |
+| `/thread [rank]` | 7-tweet X thread from a story |
+| `/newsletter [rank]` | Newsletter section from a story |
+| `/script [rank]` | TikTok/Reels voiceover script |
+| `/status` | Source health: items fetched, top score, spikes |
+| `/chat [message]` | Chat about today's news |
+| `/setvoice [description]` | Save personal writing style for all content |
+| `/module [name]` | Switch active module (tech, crypto, vietnam, …) |
+| `/caption [url]` | Download media + generate captions (or just paste a URL) |
+| `/link` | Generate a code to link with TrendPost auto-post |
 
 ---
 
@@ -102,54 +114,73 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 | Layer | Tech |
 |---|---|
 | Bot | python-telegram-bot v21 (async) |
-| AI | xAI SDK (OpenAI-compatible) – `grok-3-latest` |
+| Orchestration | LangGraph (StateGraph) |
+| AI – reports/content | Ollama – Gemma 3 (local) |
+| AI – captions | DeepSeek API (`deepseek-chat`) |
 | Scheduler | APScheduler 3.x (AsyncIOScheduler) |
 | HTTP client | httpx (async) |
-| RSS parsing | feedparser |
-| HTML scraping | BeautifulSoup4 + lxml |
-| Cache | In-memory TTL cache (no Redis needed) |
+| Feed parsing | feedparser + BeautifulSoup4 + lxml |
+| Cache | In-memory TTL cache |
+| API server | FastAPI (`:8000`) |
+| Video download | yt-dlp |
 
 ---
 
 ## Project Structure
 
 ```
-agentic-kyvra/
-├── main.py                    # Entry point – starts Telegram interface + scheduler
+kyvra-agentic/
+├── main.py                    # Entry point – starts Telegram bot + scheduler; --once flag
+├── api_server.py              # FastAPI server – POST /generate endpoint
 ├── config.py                  # Env vars and global settings
 ├── requirements.txt
 ├── .env.example
 │
-├── agents/                    # Pipeline core (domain-agnostic)
-│   ├── base.py                # BaseAgent + PipelineContext + ScoredItem
-│   ├── supervisor.py          # Orchestrator: quick_scan / generate_report
-│   ├── data_collector.py      # Async multi-source fetch + cross-source dedup
-│   ├── analyst.py             # Confidence Score + spike detection
-│   ├── narrative_scout.py     # Trend heatmap builder
-│   └── content_writer.py      # Grok report writer + /chat handler
+├── agents/                    # Pipeline core
+│   ├── state.py               # KyvraState TypedDict (shared pipeline state)
+│   ├── graph.py               # LangGraph StateGraph definition + build_graph()
+│   ├── graph_runner.py        # GraphRunner – wraps compiled graph, public API
+│   ├── registry.py            # load_module() registry
+│   ├── base.py                # BaseAgent + PipelineContext (legacy, kept for compat)
+│   ├── supervisor.py          # SupervisorAgent (legacy orchestrator)
+│   ├── analyst.py             # AnalystAgent (standalone, also used by analyst node)
+│   ├── data_collector.py      # DataCollectorAgent
+│   ├── narrative_scout.py     # NarrativeScoutAgent
+│   ├── content_writer.py      # ContentWriterAgent
+│   └── nodes/                 # LangGraph node functions
+│       ├── collect.py         # Fetch, filter, dedup, story continuity
+│       ├── analyst.py         # Confidence scoring + spike detection
+│       ├── scout.py           # Trend heatmap builder
+│       ├── writer.py          # LLM report/content generation
+│       ├── publisher.py       # mark_seen + TrendPost webhook push
+│       └── router.py          # Conditional edge functions (after_collect, after_parallel)
 │
 ├── modules/                   # Niche plugins – swap to change domain
 │   ├── base.py                # BaseModule ABC + RawItem + DataSource
-│   └── tech/
-│       ├── sources.py         # TechModule (X, GitHub, RSS sources)
-│       ├── prompts.py         # Grok prompt templates
-│       └── config.py          # Keywords, authority scores, spike thresholds
+│   ├── tech/                  # Tech/AI/GitHub
+│   ├── crypto/                # Bitcoin/DeFi/Web3
+│   ├── vietnam/               # Vietnamese tech focus
+│   ├── indie/                 # Indie hackers/SaaS
+│   ├── parody/                # Satirical news
+│   ├── sport/                 # Sports
+│   ├── political/             # Politics
+│   ├── war/                   # War/conflict
+│   ├── humor/                 # Humor
+│   ├── energy/                # Energy/climate
+│   └── markets/               # Financial markets
 │
-├── interfaces/                # Delivery channels – one folder per platform
-│   ├── telegram/
-│   │   ├── handlers.py        # /start /report /update /breaking /topic /chat
-│   │   ├── formatter.py       # Message formatting + Telegram chunker
-│   │   └── scheduler.py       # Daily 8AM cron job
-│   ├── discord/
-│   │   └── bot.py             # Placeholder – Phase 2
-│   └── web/
-│       └── app.py             # Placeholder – Phase 2 (FastAPI)
+├── interfaces/
+│   └── telegram/
+│       ├── handlers.py        # All Telegram command + message handlers
+│       ├── formatter.py       # Message formatting + chunker
+│       └── scheduler.py       # Daily 8AM APScheduler cron
 │
 ├── services/
-│   └── llm.py                 # Centralized LLM client (xAI / OpenAI-compatible)
+│   ├── llm.py                 # Ollama client (complete + chat)
+│   ├── llm_provider.py        # LLM provider abstraction (Ollama / DeepSeek routing)
+│   └── memory.py              # SQLite: voice profiles, seen items
 │
 └── utils/
-    ├── api_client.py          # Async fetchers: RSS / scrape / X API
     └── cache.py               # TTL in-memory cache
 ```
 
@@ -160,19 +191,26 @@ agentic-kyvra/
 ### Local development
 
 ```bash
-# 1. Install dependencies
+# 1. Start Ollama with Gemma 3
+ollama pull gemma3
+ollama serve
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 2. Install pre-commit hooks (blocks commits containing secrets)
+# 3. Install pre-commit hooks (blocks commits containing secrets)
 pip install pre-commit detect-secrets
 pre-commit install
 
-# 3. Configure environment
+# 4. Configure environment
 cp .env.example .env
-# Edit .env: add TELEGRAM_BOT_TOKEN and XAI_API_KEY
+# Edit .env – fill in required vars (see below)
 
-# 4. Run
+# 5. Run
 python main.py
+
+# Run the pipeline once and print to stdout (no bot, no scheduler)
+python main.py --once
 ```
 
 ### Required env vars
@@ -180,27 +218,34 @@ python main.py
 | Variable | Description |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token (from [@BotFather](https://t.me/BotFather)) |
-| `XAI_API_KEY` | xAI API key (from [console.x.ai](https://console.x.ai)) |
 | `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs for auto-report |
 | `REPORT_TIME` | Daily report time, HH:MM format (default: `08:00`) |
-| `ACTIVE_MODULE` | Module to use (default: `tech`) |
+| `TIMEZONE` | Timezone for scheduler (default: `Asia/Ho_Chi_Minh`) |
+| `ACTIVE_MODULE` | Active module slug (default: `tech`) |
+| `OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`) |
+| `OLLAMA_MODEL` | Ollama model name (default: `gemma3`) |
+| `DEEPSEEK_API_KEY` | DeepSeek API key – required for `/caption` |
+
+### Optional env vars
+
+| Variable | Description |
+|---|---|
+| `DEEPSEEK_MODEL` | DeepSeek model (default: `deepseek-chat`) |
+| `XAI_API_KEY` | Grok API key (if using xAI as LLM backend) |
+| `X_BEARER_TOKEN` | Twitter API v2 bearer token |
+| `NEWS_API_KEY` | newsapi.org key |
+| `PRODUCT_HUNT_API_KEY` | Product Hunt API key |
+| `TRENDPOST_WEBHOOK_URL` | TrendPost story push endpoint |
+| `TRENDPOST_WEBHOOK_SECRET` | HMAC secret shared with TrendPost |
+| `TRENDPOST_API_URL` | TrendPost API base URL (for `/link` and STOP handler) |
 
 ### Production deployment (GitHub Actions → server)
 
 Secrets are stored in **GitHub → Settings → Secrets and variables → Actions** — never in code.
 
-| GitHub Secret | Description |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
-| `XAI_API_KEY` | From [console.x.ai](https://console.x.ai) |
-| `REPORT_CHAT_IDS` | Comma-separated Telegram chat IDs |
-| `SERVER_HOST` | SSH host of your server |
-| `SERVER_USER` | SSH username |
-| `SERVER_SSH_KEY` | Private SSH key for deployment |
-
 On every push to `main`:
 1. GitHub Actions runs `detect-secrets` — commit is blocked if any secret is found
-2. If clean, the workflow SSHs into the server, writes `.env` from the secrets above, and restarts the bot via systemd
+2. If clean, the workflow SSHs into the server, writes `.env` from secrets, and restarts the bot via systemd
 
 **First-time server setup:**
 ```bash
@@ -212,27 +257,28 @@ sudo systemctl start kyvra-bot
 
 ---
 
-## Adding a New Module (Crypto, Finance, Vietnam…)
+## Adding a New Module
 
-1. Create `modules/<niche>/` with `sources.py`, `prompts.py`, `config.py`
-2. Implement `BaseModule` in `sources.py`
-3. Add a case in `agents/supervisor.py → load_module()`
-4. Set `ACTIVE_MODULE=<niche>` in `.env`
+1. Create `modules/<name>/` with `sources.py`, `prompts.py`, `config.py`
+2. Implement all abstract methods from `modules/base.py:BaseModule`
+3. Register in `agents/registry.py:load_module()` registry
+4. Add to `AVAILABLE_MODULES` list in `interfaces/telegram/handlers.py`
+5. Set `ACTIVE_MODULE=<name>` in `.env`
 
-Zero changes to agents, bot, or scheduler.
+Zero changes to agents, graph, or scheduler.
 
 ---
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the full plan. High-level phases:
+See [ROADMAP.md](ROADMAP.md) for the full plan.
 
 | Phase | Goal | Status |
 |---|---|---|
 | 0 – Foundation | Multi-agent pipeline, Telegram bot, daily report | ✅ Done |
-| 1 – Signal Quality | Velocity signal, story continuity, `/status` command | 🔜 Next |
-| 2 – More Sources | Reddit, Product Hunt, YouTube, TLDR Tech | Q2 |
-| 3 – New Modules | Crypto, Vietnam, Indie niches | Q2–Q3 |
-| 4 – Creator Outputs | `/thread` `/newsletter` `/script` `/brief` | Q3 |
-| 5 – Memory | Seen-item suppression, user feedback, topic subscriptions | Q4 |
-| 6 – Autonomous Mode | Breaking news push alerts, headless `--once` mode | Q4+ |
+| 1 – Signal Quality | Velocity signal, story continuity, `/status` | ✅ Done |
+| 2 – More Sources | Reddit, TLDR Tech RSS, Product Hunt | ✅ Done |
+| 3 – New Modules + Creator Formats | Crypto, Vietnam, Indie + `/thread` `/newsletter` `/script` `/brief` | ✅ Done |
+| 4 – LangGraph Migration | StateGraph pipeline, parallel nodes, typed state | ✅ Done |
+| 5 – Memory & Personalization | Voice profiles, seen-item suppression, topic subscriptions | 🔜 Next |
+| 6 – Autonomous Mode | Breaking news push alerts, self-scheduling | Q3 |
