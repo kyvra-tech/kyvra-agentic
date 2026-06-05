@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Media caption handler — download video/image, generate Twitter caption via DeepSeek.
 """

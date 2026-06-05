@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Video downloader using yt-dlp.
 Downloads video, thumbnail, and extracts transcript/subtitles.

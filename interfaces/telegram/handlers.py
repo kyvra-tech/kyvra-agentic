@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json
@@ -9,7 +11,8 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
-from agents.supervisor import SupervisorAgent, load_module
+from agents.graph_runner import GraphRunner
+from agents.registry import load_module
 from agents.content_writer import chat_with_llm
 from interfaces.telegram.formatter import split_long_message, format_update, format_breaking
 from config import ACTIVE_MODULE, TRENDPOST_API_URL, TRENDPOST_WEBHOOK_SECRET
@@ -26,9 +29,9 @@ _chat_histories: dict[int, list[dict]] = {}
 MAX_HISTORY = 10  # keep last N turns
 
 
-def _get_module():
-    """Return a fresh module instance using the current runtime selection."""
-    return load_module(_active_module)
+def _runner() -> GraphRunner:
+    """Return a GraphRunner for the currently active module."""
+    return GraphRunner(_active_module)
 
 
 async def cmd_module(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -123,25 +126,55 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
+_STREAM_LABELS = {
+    "collect":   "📡 Fetching news sources...",
+    "analyst":   "📊 Scoring stories...",
+    "scout":     "🔍 Scanning trends...",
+    "join":      "🔗 Analysing...",
+    "writer":    "✍️ Writing report...",
+    "publisher": "📬 Saving results...",
+}
+
+
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"[Analytics] user={update.effective_user.id} command=report module={_active_module}")
-    msg = await update.message.reply_text("⏳ Gathering news and writing report... (30-60 sec)")
+    msg = await update.message.reply_text("⏳ Starting pipeline...")
 
+    # Stream graph events → update the Telegram message at each node so the
+    # user sees live progress instead of a frozen "please wait" spinner.
+    final_state = None
     try:
-        supervisor = SupervisorAgent(_get_module())
-        report, ctx = await supervisor.generate_report_with_ctx()
+        runner = _runner()
+        async for node_name, state in runner.stream_events(mode="full"):
+            if node_name == "__end__":
+                final_state = state
+            elif node_name in _STREAM_LABELS:
+                try:
+                    await msg.edit_text(_STREAM_LABELS[node_name])
+                except Exception:
+                    pass  # ignore "message not modified" Telegram errors
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
         await msg.edit_text("❌ Could not generate report. Please try again later.")
         return
 
+    if not final_state:
+        await msg.edit_text("❌ Pipeline returned no results. Please try again.")
+        return
+
+    report = final_state.get("report_text") or "Could not generate report."
+    errors = final_state.get("errors") or []
+    if errors:
+        report += f"\n\n⚠️ _{len(errors)} source(s) had issues and were skipped._"
+
     await msg.delete()
 
     # Build inline keyboard: EN + JA tweet buttons per top story
     keyboard = None
-    if ctx and ctx.top_items:
+    top_items = final_state.get("top_items") or []
+    if top_items:
         rows = []
-        for i in range(1, min(len(ctx.top_items), 7) + 1):
+        for i in range(1, min(len(top_items), 7) + 1):
             rows.append([
                 InlineKeyboardButton(f"🐦 EN #{i}", callback_data=f"tweet:{_active_module}:{i}:en"),
                 InlineKeyboardButton(f"🇯🇵 JA #{i}", callback_data=f"tweet:{_active_module}:{i}:ja"),
@@ -160,15 +193,15 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     logger.info(f"[Analytics] user={update.effective_user.id} command=update module={_active_module}")
     msg = await update.message.reply_text("⚡ Scanning latest news... (no AI writing, ~10 sec)")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Quick scan failed: {e}")
         await msg.edit_text("❌ Scan failed. Please try again.")
         return
 
-    total = len(ctx.raw_items)
-    text = format_update(ctx.top_items, total)
+    total = len(ctx.get("raw_items") or [])
+    text = format_update(ctx.get("top_items") or [], total)
     await msg.delete()
     await update.message.reply_text(text, disable_web_page_preview=True)
 
@@ -178,14 +211,14 @@ async def cmd_breaking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info(f"[Analytics] user={update.effective_user.id} command=breaking module={_active_module}")
     msg = await update.message.reply_text("🚨 Checking for spikes...")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         ctx = await supervisor.quick_scan()
     except Exception as e:
         logger.error(f"Breaking scan failed: {e}")
         await msg.edit_text("❌ Scan failed. Please try again.")
         return
 
-    spikes = [i for i in ctx.scored_items if i.is_spike]
+    spikes = [i for i in (ctx.get("scored_items") or []) if i.is_spike]
     text = format_breaking(spikes)
     await msg.delete()
     await update.message.reply_text(text, disable_web_page_preview=True)
@@ -203,7 +236,7 @@ async def cmd_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"[Analytics] user={update.effective_user.id} command=topic module={_active_module} topic={topic!r}")
     msg = await update.message.reply_text(f"🔍 Finding news about {topic}...")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         report = await supervisor.generate_report_for_topic(topic)
     except Exception as e:
         logger.error(f"Topic report failed for '{topic}': {e}")
@@ -237,7 +270,7 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"[Analytics] user={user_id} command=brief module={_active_module} rank={rank}")
     msg = await update.message.reply_text("⚡ Writing today's brief...")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         brief = await supervisor.generate_brief(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Brief generation failed: {e}")
@@ -259,7 +292,7 @@ async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     label = f"story #{rank}" if rank > 1 else "today's top story"
     msg = await update.message.reply_text(f"🧵 Writing thread from {label}... (30-60 sec)")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         thread = await supervisor.generate_thread(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Thread generation failed: {e}")
@@ -286,7 +319,7 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     typing_msg = await update.message.reply_text("💭 Thinking...")
 
     try:
-        reply = await chat_with_llm(user_message, _get_module().get_chat_system_prompt(), history)
+        reply = await chat_with_llm(user_message, load_module(_active_module).get_chat_system_prompt(), history)
     except Exception as e:
         logger.error(f"Chat LLM call failed for user {user_id}: {e}")
         await typing_msg.edit_text("❌ Could not get a response. Please try again.")
@@ -304,7 +337,7 @@ async def cmd_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/status — source health & last run summary (cached within 2h, else live scan)."""
     logger.info(f"[Analytics] user={update.effective_user.id} command=status module={_active_module}")
-    from agents.supervisor import _STATUS_CACHE
+    from agents.graph_runner import _STATUS_CACHE
     import time as _time
     cached = _STATUS_CACHE.get(_active_module)
     if cached:
@@ -312,7 +345,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     else:
         msg = await update.message.reply_text("📊 Running status check... (~10 sec)")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         status = await supervisor.get_status()
     except Exception as e:
         logger.error(f"Status check failed: {e}")
@@ -347,7 +380,7 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.info(f"[Analytics] user={user_id} command=newsletter url={arg[:80]}")
         msg = await update.message.reply_text("📰 Reading article and writing newsletter section...")
         try:
-            supervisor = SupervisorAgent(_get_module())
+            supervisor = _runner()
             newsletter = await supervisor.generate_newsletter_from_url(arg, user_id=user_id)
         except Exception as e:
             logger.error(f"Newsletter from URL failed: {e}")
@@ -363,7 +396,7 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.info(f"[Analytics] user={user_id} command=newsletter text len={len(arg)}")
         msg = await update.message.reply_text("📰 Writing newsletter section from your description...")
         try:
-            supervisor = SupervisorAgent(_get_module())
+            supervisor = _runner()
             newsletter = await supervisor.generate_newsletter_from_text(arg, user_id=user_id)
         except Exception as e:
             logger.error(f"Newsletter from text failed: {e}")
@@ -382,7 +415,7 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     label = f"story #{rank}" if rank > 1 else "today's top story"
     msg = await update.message.reply_text(f"📰 Writing newsletter section from {label}...")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         newsletter = await supervisor.generate_newsletter(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Newsletter generation failed: {e}")
@@ -403,7 +436,7 @@ async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     label = f"story #{rank}" if rank > 1 else "today's top story"
     msg = await update.message.reply_text(f"🎬 Writing voiceover script from {label}...")
     try:
-        supervisor = SupervisorAgent(_get_module())
+        supervisor = _runner()
         script = await supervisor.generate_script(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Script generation failed: {e}")
@@ -650,7 +683,7 @@ async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await query.message.reply_text(f"✍️ Generating {lang_label} tweet for story #{rank}...")
 
     try:
-        supervisor = SupervisorAgent(load_module(module_name))
+        supervisor = GraphRunner(module_name)
         tweet = await supervisor.generate_tweet_hook(rank=rank, lang=lang)
     except Exception as e:
         logger.error(f"Tweet hook generation failed: {e}")

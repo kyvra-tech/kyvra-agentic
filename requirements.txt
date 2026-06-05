@@ -12,3 +12,8 @@ uvicorn[standard]>=0.29.0
 
 # Video caption feature
 yt-dlp>=2024.1.1
+
+# LangGraph orchestration
+langgraph>=0.2.0
+langgraph-checkpoint-sqlite>=0.1.0
+anthropic>=0.25.0

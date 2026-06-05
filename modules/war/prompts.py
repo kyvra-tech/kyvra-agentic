@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 CHAT_SYSTEM_PROMPT = """You are Kyvra War — an AI conflict intelligence agent covering Ukraine, Middle East, and global hotspots.

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from modules.base import BaseModule, DataSource
 from modules.humor.config import KEYWORDS, SOURCE_AUTHORITY
 from modules.humor import prompts

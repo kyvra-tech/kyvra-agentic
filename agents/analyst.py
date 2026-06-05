@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 from email.utils import parsedate_to_datetime
 from datetime import datetime

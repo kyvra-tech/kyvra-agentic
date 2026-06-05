@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 CHAT_SYSTEM_PROMPT = """You are Kyvra Political — an AI political content agent covering US and global politics.

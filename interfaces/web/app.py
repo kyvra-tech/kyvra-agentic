@@ -19,16 +19,19 @@ Auth: Bearer token via Authorization header (API_KEY env var).
       If API_KEY is not set the server starts in open mode (dev only).
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, field_validator
 
-from agents.supervisor import SupervisorAgent, load_module
+from agents.graph_runner import GraphRunner
+from agents.registry import load_module
 from agents.content_writer import chat_with_llm
 import services.memory as memory
 
@@ -43,7 +46,7 @@ AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie"]
 
 
 def _verify_token(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> None:
     if not _API_KEY:
         return  # open mode — no auth required
@@ -63,13 +66,13 @@ app = FastAPI(
 )
 
 
-def _supervisor(module: str) -> SupervisorAgent:
+def _runner(module: str) -> GraphRunner:
     if module not in AVAILABLE_MODULES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown module '{module}'. Available: {AVAILABLE_MODULES}",
         )
-    return SupervisorAgent(load_module(module))
+    return GraphRunner(module)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -78,7 +81,7 @@ class ChatRequest(BaseModel):
     module: str = "tech"
     message: str
     history: list[dict[str, str]] = []
-    user_id: int | None = None
+    user_id: Optional[int] = None
 
 
 class PerformanceSignalRequest(BaseModel):
@@ -112,7 +115,7 @@ class StatusResponse(BaseModel):
 
 class VoiceResponse(BaseModel):
     user_id: int
-    voice: str | None
+    voice: Optional[str]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -131,7 +134,7 @@ async def health() -> dict:
 @app.get("/report", response_model=TextResponse, tags=["content"], dependencies=[Depends(_verify_token)])
 async def report(module: str = Depends(_module_param)) -> TextResponse:
     """Full AI-written daily report."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_report()
     return TextResponse(module=module, result=result)
 
@@ -139,8 +142,9 @@ async def report(module: str = Depends(_module_param)) -> TextResponse:
 @app.get("/update", tags=["signal"], dependencies=[Depends(_verify_token)])
 async def update(module: str = Depends(_module_param)) -> dict:
     """Fast scan — top scored items, no LLM writing."""
-    sv = _supervisor(module)
-    ctx = await sv.quick_scan()
+    sv = _runner(module)
+    state = await sv.quick_scan()
+    items = state.get("top_items") or []
     top_items = [
         {
             "title": i.title,
@@ -151,16 +155,16 @@ async def update(module: str = Depends(_module_param)) -> dict:
             "is_spike": i.is_spike,
             "published_at": i.published_at,
         }
-        for i in ctx.top_items
+        for i in items
     ]
-    return {"module": module, "total_fetched": len(ctx.raw_items), "top_items": top_items, "generated_at": datetime.now(timezone.utc).isoformat()}
+    return {"module": module, "total_fetched": len(state.get("raw_items") or []), "top_items": top_items, "generated_at": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/breaking", tags=["signal"], dependencies=[Depends(_verify_token)])
 async def breaking(module: str = Depends(_module_param)) -> dict:
     """Spike items only — viral X tweets and high-momentum signals."""
-    sv = _supervisor(module)
-    ctx = await sv.quick_scan()
+    sv = _runner(module)
+    state = await sv.quick_scan()
     spikes = [
         {
             "title": i.title,
@@ -169,7 +173,7 @@ async def breaking(module: str = Depends(_module_param)) -> dict:
             "confidence_score": i.confidence_score,
             "published_at": i.published_at,
         }
-        for i in ctx.scored_items if i.is_spike
+        for i in (state.get("scored_items") or []) if i.is_spike
     ]
     return {"module": module, "spikes": spikes}
 
@@ -181,7 +185,7 @@ async def topic(
 ) -> TextResponse:
     """AI report scoped to a keyword."""
     q = q[:200].replace("\n", " ").strip()
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_report_for_topic(q)
     return TextResponse(module=module, result=result)
 
@@ -189,10 +193,10 @@ async def topic(
 @app.get("/brief", response_model=TextResponse, tags=["content"], dependencies=[Depends(_verify_token)])
 async def brief(
     module: str = Depends(_module_param),
-    user_id: int | None = Query(None, description="User ID for voice profile lookup"),
+    user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
 ) -> TextResponse:
     """3-bullet shareable brief from today's top 3 stories."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_brief(user_id=user_id)
     return TextResponse(module=module, result=result)
 
@@ -200,10 +204,10 @@ async def brief(
 @app.get("/thread", response_model=TextResponse, tags=["content"], dependencies=[Depends(_verify_token)])
 async def thread(
     module: str = Depends(_module_param),
-    user_id: int | None = Query(None, description="User ID for voice profile lookup"),
+    user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
 ) -> TextResponse:
     """7-tweet Twitter/X thread from today's top story."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_thread(user_id=user_id)
     return TextResponse(module=module, result=result)
 
@@ -211,10 +215,10 @@ async def thread(
 @app.get("/newsletter", response_model=TextResponse, tags=["content"], dependencies=[Depends(_verify_token)])
 async def newsletter(
     module: str = Depends(_module_param),
-    user_id: int | None = Query(None, description="User ID for voice profile lookup"),
+    user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
 ) -> TextResponse:
     """Newsletter section from today's top story."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_newsletter(user_id=user_id)
     return TextResponse(module=module, result=result)
 
@@ -222,10 +226,10 @@ async def newsletter(
 @app.get("/script", response_model=TextResponse, tags=["content"], dependencies=[Depends(_verify_token)])
 async def script(
     module: str = Depends(_module_param),
-    user_id: int | None = Query(None, description="User ID for voice profile lookup"),
+    user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
 ) -> TextResponse:
     """TikTok/Reels voiceover script from today's top story."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     result = await sv.generate_script(user_id=user_id)
     return TextResponse(module=module, result=result)
 
@@ -233,7 +237,7 @@ async def script(
 @app.get("/status", response_model=StatusResponse, tags=["meta"], dependencies=[Depends(_verify_token)])
 async def pipeline_status(module: str = Depends(_module_param)) -> StatusResponse:
     """Source health: items fetched, top confidence score, spike count."""
-    sv = _supervisor(module)
+    sv = _runner(module)
     s = await sv.get_status()
     return StatusResponse(
         module=s["module"],

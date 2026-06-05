@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 CHAT_SYSTEM_PROMPT = """You are Kyvra Sport — an AI sports content agent covering NBA, NFL, Premier League, La Liga, Bundesliga, Champions League, and UFC.

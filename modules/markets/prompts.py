@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 CHAT_SYSTEM_PROMPT = """You are Kyvra Markets — a financial markets and macro AI content agent.
