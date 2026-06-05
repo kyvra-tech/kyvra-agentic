@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from modules.base import BaseModule, DataSource
 from modules.sport.config import KEYWORDS, SOURCE_AUTHORITY
 from modules.sport import prompts

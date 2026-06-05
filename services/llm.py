@@ -4,6 +4,8 @@ LLM service — DeepSeek API as primary model.
 Get your key at: platform.deepseek.com
 Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL in .env
 """
+from __future__ import annotations
+
 import logging
 from openai import AsyncOpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_MODEL

@@ -14,6 +14,15 @@ GROK_MODEL = os.getenv("GROK_MODEL", "grok-3-latest")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3")
 
+# Anthropic Claude (optional — used when CONTENT_LLM_PROVIDER=claude)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+
+# LLM provider routing (services/llm_provider.py)
+# Options: deepseek | ollama | claude
+CONTENT_LLM_PROVIDER = os.getenv("CONTENT_LLM_PROVIDER", "deepseek")
+CAPTION_LLM_PROVIDER = os.getenv("CAPTION_LLM_PROVIDER", "deepseek")
+
 ACTIVE_MODULE = os.getenv("ACTIVE_MODULE", "tech")
 
 REPORT_TIME = os.getenv("REPORT_TIME", "08:00")

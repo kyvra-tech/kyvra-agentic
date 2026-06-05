@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from modules.base import BaseModule, DataSource
 from modules.tech.config import KEYWORDS, SOURCE_AUTHORITY
 from modules.tech import prompts

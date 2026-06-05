@@ -1,6 +1,6 @@
-# agentic-kyvra — CLAUDE.md
+# CLAUDE.md
 
-AI assistant context for the agentic-kyvra Python Telegram bot and AI news pipeline.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commit messages
 
@@ -24,7 +24,28 @@ Python multi-agent system that curates AI/tech news daily, drafts English social
 - **Feed parsing:** feedparser, BeautifulSoup4
 - **API server:** FastAPI (`:8000`) — called by creator-backend
 
-## How to run
+## Commands
+
+```bash
+# Run tests
+pytest
+
+# Run a single test file
+pytest tests/test_analyst.py
+
+# Run a single test by name
+pytest tests/test_analyst.py::test_function_name -v
+
+# Start the bot (normal mode)
+python main.py
+
+# Run the pipeline once and print to stdout (no bot, no scheduler)
+python main.py --once
+```
+
+No linter is configured — no ruff, flake8, or mypy setup exists. Pre-commit hooks run `detect-secrets` and basic file checks.
+
+## How to set up
 
 ```bash
 # 1. Start Ollama with Gemma 3
@@ -32,7 +53,6 @@ ollama pull gemma3
 ollama serve
 
 # 2. Install dependencies
-cd agentic-kyvra
 pip install -r requirements.txt
 
 # 3. Configure environment
@@ -42,13 +62,13 @@ cp .env.example .env   # fill in required vars
 python main.py
 ```
 
-Systemd service file: `kyvra-bot.service`
+Systemd service file: `kyvra-bot.service` (production VPS). CI/CD deploys via SSH on push to `main` (`.github/workflows/deploy.yml`).
 
 ## Environment variables
 
 ```
 TELEGRAM_BOT_TOKEN=<from @BotFather>
-ACTIVE_MODULE=tech                    # tech | crypto | vietnam | indie
+ACTIVE_MODULE=tech                    # see available modules below
 REPORT_CHAT_IDS=<comma-separated telegram chat IDs>
 REPORT_TIME=08:00                     # local time in TIMEZONE
 TIMEZONE=Asia/Ho_Chi_Minh
@@ -61,8 +81,11 @@ OLLAMA_MODEL=gemma3
 DEEPSEEK_API_KEY=<from platform.deepseek.com>
 DEEPSEEK_MODEL=deepseek-chat
 
-# Optional: X/Twitter API
+# Optional: additional AI/news APIs
+XAI_API_KEY=<Grok API key>
 X_BEARER_TOKEN=<twitter api v2 bearer>
+NEWS_API_KEY=<newsapi.org>
+PRODUCT_HUNT_API_KEY=<producthunt.com>
 
 # Optional: TrendPost integration
 TRENDPOST_WEBHOOK_URL=https://api.trendpost.co/api/webhooks/kyvra-stories
@@ -74,19 +97,19 @@ TRENDPOST_API_URL=https://api.trendpost.co
 
 ```
 agentic-kyvra/
-├── main.py                     # Entry point: bot + scheduler startup
+├── main.py                     # Entry point: bot + scheduler startup; --once flag for one-shot
 ├── config.py                   # All env vars + constants
 ├── api_server.py               # FastAPI server — POST /generate endpoint
 ├── agents/
-│   ├── supervisor.py           # Orchestrates the full pipeline
+│   ├── supervisor.py           # Orchestrates the full pipeline; load_module() registry
 │   ├── data_collector.py       # Fetches GitHub Trending, RSS, Reddit
 │   ├── analyst.py              # Confidence score (0-100)
 │   ├── narrative_scout.py      # Angle / narrative selection
 │   ├── content_writer.py       # Content draft via Ollama
-│   └── base.py                 # Base agent + dataclasses
+│   └── base.py                 # BaseAgent (ABC) + PipelineContext dataclass
 ├── interfaces/
 │   └── telegram/
-│       ├── handlers.py         # All Telegram command + message handlers
+│       ├── handlers.py         # All Telegram command + message handlers; AVAILABLE_MODULES list
 │       ├── formatter.py        # Message formatting helpers
 │       └── scheduler.py        # APScheduler setup (daily report)
 ├── modules/
@@ -95,6 +118,13 @@ agentic-kyvra/
 │   ├── crypto/                 # Bitcoin/DeFi/Web3 module
 │   ├── vietnam/                # Vietnamese tech focus module
 │   ├── indie/                  # Indie hackers/SaaS module
+│   ├── parody/                 # Parody/satirical news module
+│   ├── sport/                  # Sports module
+│   ├── political/              # Politics module
+│   ├── war/                    # War/conflict module
+│   ├── humor/                  # Humor module
+│   ├── energy/                 # Energy/climate module
+│   ├── markets/                # Financial markets module
 │   └── video/                  # Video/image caption module
 │       ├── config.py           # Supported domains, yt-dlp opts
 │       ├── downloader.py       # yt-dlp wrapper + transcript extraction
@@ -131,6 +161,8 @@ SupervisorAgent
         Formats for: report | thread | brief | newsletter | script
 ```
 
+Context object `PipelineContext` (dataclass in `agents/base.py`) is threaded immutably through each agent: `module`, `raw_items`, `scored_items`, `top_items`, `trend_heatmap`, `report_text`, `errors`.
+
 ## Video/Image caption pipeline
 
 ```
@@ -165,7 +197,7 @@ User pastes URL (or /caption <url>)
 | `/status` | Source health: items fetched, top score, spikes |
 | `/chat [message]` | Chat about today's news |
 | `/setvoice [description]` | Save personal writing style for all content |
-| `/module [name]` | Switch active module: tech \| crypto \| vietnam \| indie |
+| `/module [name]` | Switch active module: tech \| crypto \| vietnam \| indie \| parody \| sport \| political \| war \| humor \| energy \| markets |
 | `/caption [url]` | Download media + generate captions (or just paste a URL) |
 | `/link` | Generate code to link with TrendPost auto-post |
 

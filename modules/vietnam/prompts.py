@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 CHAT_SYSTEM_PROMPT = """You are Kyvra Vietnam — an AI assistant for Vietnam's tech and startup ecosystem.
