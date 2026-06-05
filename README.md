@@ -21,7 +21,6 @@ Modular, multi-agent Telegram bot that monitors news across 11 niches daily and 
 - **Creator Formats** – every report can be turned into a Twitter thread, newsletter section, TikTok script, or 3-bullet brief
 - **Video Captions** – paste any YouTube/TikTok/Instagram URL to get AI-generated captions for 3 platforms
 - **Multi-Module** – switch between 11 topic niches: tech, crypto, vietnam, indie, parody, sport, political, war, humor, energy, markets
-- **TrendPost Integration** – push stories to TrendPost for scheduled auto-posting
 
 ---
 
@@ -47,7 +46,7 @@ The pipeline is built on **LangGraph** (`StateGraph`). Each node is an `async de
                  │                  │
                 END             [writer]       ← LLM call (Ollama)
                                    │
-                              [publisher]      ← mark_seen + TrendPost push
+                              [publisher]      ← mark_seen (story continuity)
                                    │
                                   END
 ```
@@ -112,7 +111,6 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 | `/setvoice [description]` | Save personal writing style for all content |
 | `/module [name]` | Switch active module (tech, crypto, vietnam, …) |
 | `/caption [url]` | Download media + generate captions (or just paste a URL) |
-| `/link` | Generate a code to link with TrendPost auto-post |
 
 ---
 
@@ -159,7 +157,7 @@ kyvra-agentic/
 │       ├── analyst.py         # Confidence scoring + spike detection
 │       ├── scout.py           # Trend heatmap builder
 │       ├── writer.py          # LLM report/content generation
-│       ├── publisher.py       # mark_seen + TrendPost webhook push
+│       ├── publisher.py       # mark_seen (story continuity)
 │       └── router.py          # Conditional edge functions (after_collect, after_parallel)
 │
 ├── modules/                   # Niche plugins – swap to change domain
@@ -264,7 +262,6 @@ docker compose up -d --build
 | `TIMEZONE` | Scheduler timezone (default: `Asia/Ho_Chi_Minh`) |
 | `X_BEARER_TOKEN` | Twitter API bearer — improves signal quality |
 | `NEWS_API_KEY` | [newsapi.org](https://newsapi.org) key |
-| `TRENDPOST_WEBHOOK_URL` | TrendPost integration — leave empty to disable |
 
 ### VPS / server deployment (systemd)
 

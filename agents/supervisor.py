@@ -319,7 +319,7 @@ async def generate_report_for_module(module_name: str) -> str:
 
 
 async def generate_report_for_module_with_ctx(module_name: str):
-    """Like generate_report_for_module but also returns the pipeline context (for TrendPost push)."""
+    """Like generate_report_for_module but also returns the pipeline context."""
     module = load_module(module_name)
     supervisor = SupervisorAgent(module)
     return await supervisor.generate_report_with_ctx()

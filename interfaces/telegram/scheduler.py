@@ -1,15 +1,11 @@
-import hashlib
-import hmac
-import json
 import logging
-import httpx
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
 from agents.supervisor import SupervisorAgent, load_module
 from interfaces.telegram.formatter import split_long_message, _signal_label_key
-from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE, TRENDPOST_WEBHOOK_URL, TRENDPOST_WEBHOOK_SECRET
+from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE
 
 logger = logging.getLogger(__name__)
 
@@ -37,58 +33,6 @@ _MODULE_META = {
 _ITEMS_PER_MODULE = 2  # top stories per module in the combined digest
 
 
-async def _push_to_trendpost(module_name: str, supervisor_ctx) -> None:
-    """Push top stories for a module to TrendPost via HMAC-signed webhook."""
-    if not TRENDPOST_WEBHOOK_URL or not TRENDPOST_WEBHOOK_SECRET:
-        return
-
-    if not supervisor_ctx or not getattr(supervisor_ctx, "top_items", None):
-        logger.info("[TrendPost push] No top_items for module '%s' — skipping", module_name)
-        return
-
-    stories = [
-        {
-            "title": item.title,
-            "url": item.url,
-            "confidence_score": item.confidence_score,
-            "signal_label": _signal_label_key(item),
-            "summary": getattr(item, "summary", None),
-        }
-        for item in supervisor_ctx.top_items[:7]
-    ]
-
-    payload = {"module": module_name, "stories": stories}
-    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-    signature = "sha256=" + hmac.new(
-        TRENDPOST_WEBHOOK_SECRET.encode("utf-8"),
-        body.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(
-                TRENDPOST_WEBHOOK_URL,
-                content=body,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-kyvra-signature": signature,
-                },
-            )
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(
-                "[TrendPost push] Module '%s': %d inserted, %d skipped",
-                module_name, result.get("inserted", 0), result.get("skipped", 0),
-            )
-        else:
-            logger.warning(
-                "[TrendPost push] Module '%s': unexpected status %d",
-                module_name, response.status_code,
-            )
-    except Exception as exc:
-        logger.error("[TrendPost push] Module '%s' failed: %s", module_name, exc)
-
 
 def _format_module_section(module_name: str, top_items: list) -> str:
     """Format 2 top items from a module as a compact digest section."""
@@ -113,7 +57,6 @@ async def _send_combined_digest(bot: Bot) -> None:
 
     now = datetime.now(_VN_TZ).strftime("%d/%m/%Y %H:%M GMT+7")
     sections = []
-    trendpost_tasks = []
 
     for module_name in _ALL_MODULES:
         logger.info("[Scheduler] Scanning module: %s", module_name)
@@ -122,7 +65,6 @@ async def _send_combined_digest(bot: Bot) -> None:
             ctx = await supervisor.quick_scan()
             if ctx.top_items:
                 sections.append(_format_module_section(module_name, ctx.top_items))
-                trendpost_tasks.append((module_name, ctx))
             else:
                 logger.info("[Scheduler] No items for module '%s' — skipped from digest", module_name)
         except Exception as e:
@@ -142,10 +84,6 @@ async def _send_combined_digest(bot: Bot) -> None:
             logger.info("[Scheduler] Combined digest sent to %s", chat_id)
         except Exception as e:
             logger.error("[Scheduler] Failed to send digest to %s: %s", chat_id, e)
-
-    # Push to TrendPost (non-blocking)
-    # for module_name, ctx in trendpost_tasks:
-    #     await _push_to_trendpost(module_name, ctx)
 
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
