@@ -71,7 +71,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "I monitor GitHub Trending, Reddit, RSS feeds and more, "
         "then distill it into a daily briefing with content angles every morning at 8 AM\\.\n\n"
         "*Quick start:*\n"
-        "⚡ `/update` – Fast news scan \\(~10 sec\\)\n"
+        "⚡ `/update` – Fast news scan \\(\\~10 sec\\)\n"
         "📋 `/report` – Full AI report \\+ tweet buttons\n"
         "🎥 Paste a video link – get viral captions instantly\n\n"
         "Type /help to see all features\\."
