@@ -204,7 +204,6 @@ anthropic>=0.25.0
 |---|---|
 | `langgraph` | The graph engine: StateGraph, nodes, edges, conditional routing, streaming |
 | `langgraph-checkpoint-sqlite` | Persistence layer: saves graph state to SQLite so runs can be resumed after crashes. Used in Phase 7 (human-in-the-loop) |
-| `anthropic` | Anthropic Claude SDK — used by `ClaudeProvider` in Phase 4 |
 
 **Verify the install:**
 ```bash
@@ -672,15 +671,11 @@ class DeepSeekProvider(LLMProvider):
         )
         return response.choices[0].message.content
 
-class OllamaProvider(LLMProvider):
-    """Uses local Ollama server — same OpenAI wire protocol, different URL."""
     async def complete(self, prompt, max_tokens=2000):
-        # Ollama exposes /v1/chat/completions — same AsyncOpenAI client works!
         response = await self._client.chat.completions.create(...)
         return response.choices[0].message.content
 
-class ClaudeProvider(LLMProvider):
-    """Uses Anthropic Claude — different SDK, different message format."""
+class DeepSeekProvider(LLMProvider):
     async def complete(self, prompt, max_tokens=2000):
         message = await self._client.messages.create(
             model=self._model, max_tokens=max_tokens,
@@ -702,40 +697,30 @@ def get_content_provider() -> LLMProvider:
 Change ONE line in your `.env` file:
 
 ```bash
-# Use local Ollama (free, no API key)
-CONTENT_LLM_PROVIDER=ollama
 
 # Use DeepSeek (cheap API)
 CONTENT_LLM_PROVIDER=deepseek
 
 # Use Claude (most capable)
-CONTENT_LLM_PROVIDER=claude
-ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 No code changes. This is what the Strategy pattern achieves.
 
-### Why Ollama uses the OpenAI SDK
 
-Ollama exposes an OpenAI-compatible REST API at `/v1/chat/completions`.
 The `AsyncOpenAI` client just sends HTTP — it doesn't care if the server
-is OpenAI, DeepSeek, or Ollama. We just point `base_url` at Ollama:
 
 ```python
 self._client = AsyncOpenAI(
-    api_key="ollama",                         # Ollama ignores the key
-    base_url=f"{OLLAMA_BASE_URL}/v1",         # http://localhost:11434/v1
 )
 ```
 
 ### Why Claude needs a different approach
 
-Anthropic's SDK does NOT use the OpenAI wire protocol. It has its own:
 - Different endpoint (`/v1/messages` not `/v1/chat/completions`)
 - Different request format (system prompt is a separate field)
 - Different response structure (`message.content[0].text` not `choices[0].message.content`)
 
-`ClaudeProvider.chat()` handles this by extracting the system message:
+`DeepSeekProvider.chat()` handles this by extracting the system message:
 
 ```python
 async def chat(self, messages, max_tokens=1000):
@@ -743,7 +728,6 @@ async def chat(self, messages, max_tokens=1000):
     user_messages = []
     for m in messages:
         if m["role"] == "system":
-            system = m["content"]   # Anthropic requires system as a separate field
         else:
             user_messages.append(m)
 

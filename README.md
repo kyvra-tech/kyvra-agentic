@@ -44,7 +44,6 @@ The pipeline is built on **LangGraph** (`StateGraph`). Each node is an `async de
                     /              \
              "quick_end"         "write"
                  │                  │
-                END             [writer]       ← LLM call (Ollama)
                                    │
                               [publisher]      ← mark_seen (story continuity)
                                    │
@@ -65,7 +64,6 @@ The pipeline is built on **LangGraph** (`StateGraph`). Each node is an `async de
 Top 7 Tech Insights today:
 
 1. 🔥 Claude 4 launches with advanced tool use | Confidence: 94/100
-   📌 Anthropic shipped Claude 4 with major improvements for agentic tasks...
    🎯 Content angle: "5-point thread: How Claude 4 changes the AI agent workflow"
 
 2. 📈 New OSS framework hits #1 GitHub Trending | Confidence: 78/100
@@ -83,7 +81,6 @@ Top 7 Tech Insights today:
 | Signal | Points |
 |---|---|
 | Engagement (GitHub stars/day, HN points, Reddit score) | 0 – 40 |
-| Source authority (Anthropic/OpenAI blog = 20) | 0 – 20 |
 | Recency (< 6h = 20, < 24h = 13, < 48h = 6) | 0 – 20 |
 | Relevance base (passed keyword filter) | 10 |
 | Cross-source boost (+5 per extra source, max 15) | 0 – 15 |
@@ -120,7 +117,6 @@ Items with engagement far above average are flagged as **spikes** (`is_spike=Tru
 |---|---|
 | Bot | python-telegram-bot v21 (async) |
 | Orchestration | LangGraph (StateGraph) |
-| AI – reports/content | Ollama – Gemma 3 (local) |
 | AI – captions | DeepSeek API (`deepseek-chat`) |
 | Scheduler | APScheduler 3.x (AsyncIOScheduler) |
 | HTTP client | httpx (async) |
@@ -181,8 +177,6 @@ kyvra-agentic/
 │       └── scheduler.py       # Daily 8AM APScheduler cron
 │
 ├── services/
-│   ├── llm.py                 # Ollama client (complete + chat)
-│   ├── llm_provider.py        # LLM provider abstraction (Ollama / DeepSeek routing)
 │   └── memory.py              # SQLite: voice profiles, seen items
 │
 └── utils/
@@ -221,8 +215,6 @@ cp .env.example .env
 # 2a. Start with DeepSeek (no GPU needed — recommended)
 docker compose -f docker-compose.deepseek.yml up -d
 
-# 2b. Or start with local Ollama (free, needs a decent machine)
-docker compose up -d
 # First run pulls gemma3 (~5 GB) — give it a few minutes
 ```
 
@@ -230,7 +222,6 @@ docker compose up -d
 
 ```bash
 git pull
-docker compose up -d --build
 ```
 
 ### Environment variables
@@ -247,11 +238,7 @@ docker compose up -d --build
 
 | Variable | Default | Description |
 |---|---|---|
-| `CONTENT_LLM_PROVIDER` | `deepseek` | `deepseek` \| `ollama` \| `claude` |
 | `CAPTION_LLM_PROVIDER` | `deepseek` | Same options |
-| `OLLAMA_BASE_URL` | `http://ollama:11434` | Only if using Ollama |
-| `OLLAMA_MODEL` | `gemma3` | Only if using Ollama |
-| `ANTHROPIC_API_KEY` | — | Only if using Claude |
 
 **Optional:**
 
@@ -281,8 +268,6 @@ CI/CD via GitHub Actions is also supported — see `.github/workflows/deploy.yml
 ### Local development (no Docker)
 
 ```bash
-# 1. Start Ollama
-ollama pull gemma3 && ollama serve
 
 # 2. Install deps
 pip install -r requirements.txt

@@ -11,7 +11,7 @@ KEYWORDS = [
     "launched", "open source", "github", "self-hosted",
     # Tech platforms & tools
     "cursor", "replit", "vercel", "supabase", "cloudflare", "hugging face",
-    "langchain", "llamaindex", "ollama", "vllm", "windsurf", "lovable",
+    "langchain", "llamaindex", "vllm", "windsurf", "lovable",
     # Research
     "arxiv", "paper", "benchmark", "sota", "research",
 ]

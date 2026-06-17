@@ -1,3 +1,9 @@
+# Use this if you prefer DeepSeek API over local Ollama.
+# Requires DEEPSEEK_API_KEY in .env and CONTENT_LLM_PROVIDER=deepseek.
+#
+# Usage:
+#   docker compose -f docker-compose.deepseek.yml up -d
+
 services:
   kyvra:
     build: .
@@ -8,30 +14,6 @@ services:
       - /tmp/kyvra_video:/tmp/kyvra_video
     ports:
       - "8000:8000"
-    depends_on:
-      ollama:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
 volumes:
   kyvra_data:
-  ollama_data:

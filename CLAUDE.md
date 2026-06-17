@@ -1,6 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commit messages
 
@@ -16,7 +15,7 @@ Python multi-agent system that curates news daily across 11 niches, drafts creat
 
 - **Runtime:** Python 3.11
 - **Telegram:** python-telegram-bot v21
-- **AI (news/content):** DeepSeek API (`deepseek-chat`, default) or Ollama — Gemma 3 (local, optional)
+- **AI (news/content):** DeepSeek API (`deepseek-chat`, default) 
 - **AI (video captions):** DeepSeek API (`deepseek-chat`)
 - **Video download:** yt-dlp
 - **Scheduler:** APScheduler (daily digest at 08:00 GMT+7)
@@ -46,8 +45,6 @@ python main.py --once
 # Docker (DeepSeek — recommended)
 docker compose -f docker-compose.deepseek.yml up -d
 
-# Docker (Ollama — local GPU)
-docker compose up -d
 ```
 
 No linter is configured — no ruff, flake8, or mypy setup exists. Pre-commit hooks run `detect-secrets` and basic file checks.
@@ -65,7 +62,6 @@ cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, REPORT_CHAT_IDS, DEEPSEEK_A
 python main.py
 ```
 
-If using Ollama instead of DeepSeek: `ollama pull gemma3 && ollama serve` before step 3.
 
 Systemd service file: `kyvra-bot.service` (production VPS). CI/CD deploys via SSH on push to `main` (`.github/workflows/deploy.yml`).
 
@@ -79,20 +75,13 @@ TIMEZONE=Asia/Ho_Chi_Minh
 ACTIVE_MODULE=crypto                  # see available modules below
 
 # LLM provider (pick one)
-CONTENT_LLM_PROVIDER=deepseek        # deepseek | ollama | claude
 CAPTION_LLM_PROVIDER=deepseek
 
 # DeepSeek (default — reports, content, captions)
 DEEPSEEK_API_KEY=<from platform.deepseek.com>
 DEEPSEEK_MODEL=deepseek-chat
 
-# Ollama (optional — local inference)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gemma3
 
-# Anthropic Claude (optional)
-ANTHROPIC_API_KEY=<from console.anthropic.com>
-ANTHROPIC_MODEL=claude-sonnet-4-6
 
 # Optional: additional data sources
 X_BEARER_TOKEN=<twitter api v2 bearer>
@@ -108,7 +97,6 @@ kyvra-agentic/
 ├── api_server.py               # FastAPI server — GET /report, GET /status, POST /chat
 ├── config.py                   # All env vars + constants
 ├── Dockerfile                  # Docker image
-├── docker-compose.yml          # Ollama stack
 ├── docker-compose.deepseek.yml # DeepSeek API stack (no GPU needed)
 ├── setup.sh                    # Interactive self-host wizard
 ├── agents/
@@ -154,8 +142,6 @@ kyvra-agentic/
 │       ├── handler.py          # Full pipeline: download → caption
 │       └── prompts.py          # English caption prompts (3 platforms)
 ├── services/
-│   ├── llm.py                  # Ollama client (complete + chat)
-│   ├── llm_provider.py         # Provider abstraction (DeepSeek / Ollama / Claude routing)
 │   └── memory.py               # SQLite: voice profiles, seen items
 ├── utils/
 │   └── cache.py                # TTL in-memory cache
@@ -179,7 +165,6 @@ START
   ├── "quick_end" → END   (mode: quick | breaking)
   └── "write"
         │
-    [writer]             ← LLM call (DeepSeek or Ollama)
         │
    [publisher]           ← mark_seen (story continuity)
         │
@@ -244,7 +229,6 @@ After `/report`, each story gets a 🐦 Tweet #N button. Tapping it:
 | `/report`, `/thread`, `/brief`, `/script`, `/newsletter`, `/chat`, tweet hooks | DeepSeek | `CONTENT_LLM_PROVIDER` |
 | `/caption` — video/image captions | DeepSeek | `CAPTION_LLM_PROVIDER` |
 
-Set `CONTENT_LLM_PROVIDER=ollama` to use local Gemma 3 instead.
 
 ## Adding a new module
 
@@ -257,7 +241,6 @@ Set `CONTENT_LLM_PROVIDER=ollama` to use local Gemma 3 instead.
 
 - `REPORT_CHAT_IDS` must be set or daily reports go nowhere
 - `DEEPSEEK_API_KEY` required for `/caption` and default content generation
-- If using Ollama: must be running before starting the bot (`ollama serve`)
 - The bot and FastAPI server run in the same process (`main.py` starts both)
 - python-telegram-bot v21 uses `asyncio` — all handlers must be `async def`
 - yt-dlp downloads go to `/tmp/kyvra_video/` and are deleted after sending

@@ -32,7 +32,6 @@ Kyvra Agentic is a self-hostable multi-agent Python system that:
 
 1. **Collects** news from RSS feeds, Reddit, GitHub Trending, and other sources
 2. **Scores** each item 0–100 using pure-Python heuristics (engagement, authority, recency)
-3. **Generates** creator-ready content (reports, threads, newsletters, scripts) via DeepSeek API or local Ollama
 4. **Delivers** content through a Telegram bot and a FastAPI HTTP server
 
 The pipeline is orchestrated by a **LangGraph `StateGraph`**. All nodes are `async def` functions that receive the shared `KyvraState` TypedDict and return only the keys they modify — LangGraph merges the diff automatically.
@@ -51,7 +50,6 @@ kyvra-agentic/
 ├── requirements.txt
 ├── .env.example
 ├── Dockerfile                 # Docker image (Python 3.11 + ffmpeg)
-├── docker-compose.yml         # Full Ollama stack
 ├── docker-compose.deepseek.yml# API-only stack (no GPU needed)
 ├── setup.sh                   # Interactive self-host wizard
 │
@@ -96,8 +94,6 @@ kyvra-agentic/
 │       └── scheduler.py       # APScheduler daily combined digest
 │
 ├── services/
-│   ├── llm.py                 # Ollama client (complete + chat modes)
-│   ├── llm_provider.py        # Provider abstraction (DeepSeek / Ollama / Claude)
 │   └── memory.py              # SQLite: seen items + voice profiles
 │
 ├── utils/
@@ -127,13 +123,8 @@ All configuration lives in `config.py`, which reads from environment variables (
 
 | Variable | Default | Description |
 |---|---|---|
-| `CONTENT_LLM_PROVIDER` | `deepseek` | `deepseek` \| `ollama` \| `claude` |
 | `CAPTION_LLM_PROVIDER` | `deepseek` | Same options |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek model name |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Only if using Ollama |
-| `OLLAMA_MODEL` | `gemma3` | Only if using Ollama |
-| `ANTHROPIC_API_KEY` | — | Only if using Claude |
-| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Only if using Claude |
 
 ### Module & schedule
 
@@ -173,7 +164,6 @@ All configuration lives in `config.py`, which reads from environment variables (
                       /               \
                "quick_end"          "write"
                    │                   │
-                  END             [writer]      ← LLM call (DeepSeek or Ollama)
                                       │
                                [publisher]      ← mark_seen (story continuity)
                                       │
@@ -477,13 +467,9 @@ Selects the right backend based on `CONTENT_LLM_PROVIDER` / `CAPTION_LLM_PROVIDE
 ```python
 def get_content_provider() -> LLMProvider:
     # deepseek → DeepSeekProvider
-    # ollama   → OllamaProvider
-    # claude   → ClaudeProvider
 
 def get_caption_provider() -> LLMProvider:
     # deepseek → DeepSeekProvider (default)
-    # ollama   → OllamaProvider
-    # claude   → ClaudeProvider
 ```
 
 Each provider implements:
@@ -494,13 +480,9 @@ class LLMProvider(ABC):
     async def chat(self, messages: list[dict], ...) -> str: ...
 ```
 
-### `services/llm.py` — Ollama client
 
-Low-level async client for the Ollama HTTP API. Used by `OllamaProvider`.
 
 ```python
-async def complete(prompt: str, model: str = OLLAMA_MODEL) -> str: ...
-async def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str: ...
 ```
 
 Uses `httpx.AsyncClient` with a 120s timeout.
@@ -713,7 +695,6 @@ pytest -v -k "spike"           # filter by name
 | `test_data_collector.py` | Source fetch mocking, dedup logic, keyword filter |
 | `test_memory.py` | SQLite mark_seen / is_seen / voice profiles |
 
-All tests use `pytest-asyncio` for async test functions. External HTTP calls are mocked with `unittest.mock.AsyncMock`. No real DeepSeek or Ollama calls in tests.
 
 ---
 
@@ -802,8 +783,6 @@ Or at runtime: `/module mymodule` in Telegram.
 # DeepSeek — no GPU needed
 docker compose -f docker-compose.deepseek.yml up -d
 
-# Ollama — local inference
-docker compose up -d
 ```
 
 Or use the interactive wizard:
@@ -847,7 +826,6 @@ On push to `main`:
 |---|---|
 | `DEEPSEEK_API_KEY` required | All content generation and `/caption` silently fail without it |
 | `REPORT_CHAT_IDS` required | Daily digest silently skips if not set |
-| Ollama optional | Only needed if `CONTENT_LLM_PROVIDER=ollama`; must be running before bot start |
 | Video files > 50 MB | Not sent to Telegram; caption still generated |
 | python-telegram-bot v21 | All handlers **must** be `async def`; mixing sync handlers causes silent failures |
 | Single-process model | Bot and API server share one asyncio loop; a blocking call in any handler stalls the whole process |
