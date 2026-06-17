@@ -3,7 +3,7 @@ import logging
 import asyncio
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from config import TELEGRAM_BOT_TOKEN, ACTIVE_MODULE
-from agents.supervisor import load_module
+from agents.registry import load_module
 from interfaces.telegram.handlers import (
     cmd_start, cmd_help, cmd_report, cmd_chat, error_handler,
     cmd_update, cmd_breaking, cmd_topic, cmd_module, cmd_thread, cmd_brief,
@@ -30,9 +30,9 @@ def main() -> None:
 
     if "--once" in sys.argv:
         async def run_once():
-            from agents.supervisor import SupervisorAgent, load_module
-            supervisor = SupervisorAgent(load_module(ACTIVE_MODULE))
-            report = await supervisor.generate_report()
+            from agents.graph_runner import GraphRunner
+            runner = GraphRunner(ACTIVE_MODULE)
+            report = await runner.generate_report()
             print(report)
         asyncio.run(run_once())
         return

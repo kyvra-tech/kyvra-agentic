@@ -28,7 +28,7 @@ from agents.graph import kyvra_graph
 from agents.registry import load_module
 from agents.state import KyvraState, empty_state
 import services.memory as memory
-import services.llm as llm
+from services.llm_provider import get_content_provider
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class GraphRunner:
         ]
         prompt = self._module.get_report_prompt(enriched)
         try:
-            return await llm.complete(prompt, max_tokens=2000)
+            return await get_content_provider().complete(prompt, max_tokens=2000)
         except Exception as e:
             logger.error("[GraphRunner] topic LLM call failed: %s", e)
             return "Could not generate report right now. Try again later."
@@ -167,7 +167,7 @@ class GraphRunner:
             {"title": item.title, "url": item.url, "summary": item.summary}, lang=lang
         )
         try:
-            return await llm.complete(prompt, max_tokens=160)
+            return await get_content_provider().complete(prompt, max_tokens=160)
         except Exception as e:
             logger.error("[GraphRunner] tweet_hook LLM failed: %s", e)
             return "Could not generate tweet. Try again later."
@@ -178,7 +178,7 @@ class GraphRunner:
                 "summary": text, "confidence_score": 80, "is_spike": False}
         prompt = self._module.get_newsletter_prompt(item, voice=voice)
         try:
-            return await llm.complete(prompt, max_tokens=800)
+            return await get_content_provider().complete(prompt, max_tokens=800)
         except Exception as e:
             logger.error("[GraphRunner] newsletter_from_text LLM failed: %s", e)
             return "Could not generate newsletter section right now. Try again later."
@@ -193,7 +193,7 @@ class GraphRunner:
                 "summary": article["text"], "confidence_score": 80, "is_spike": False}
         prompt = self._module.get_newsletter_prompt(item, voice=voice)
         try:
-            return await llm.complete(prompt, max_tokens=800)
+            return await get_content_provider().complete(prompt, max_tokens=800)
         except Exception as e:
             logger.error("[GraphRunner] newsletter_from_url LLM failed: %s", e)
             return "Could not generate newsletter section right now. Try again later."
@@ -214,7 +214,6 @@ class GraphRunner:
     async def _content_format(self, fmt: str, rank: int = 1,
                                user_id: int | None = None) -> str:
         """Run quick scan then call LLM with the right prompt format."""
-        from services.llm_provider import get_content_provider
         state = await self._run("quick")
         top = state.get("top_items") or []
         if not top:

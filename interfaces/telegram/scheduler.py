@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
-from agents.supervisor import SupervisorAgent, load_module
+from agents.graph_runner import GraphRunner
 from interfaces.telegram.formatter import split_long_message, _signal_label_key
 from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE
 
@@ -61,10 +61,11 @@ async def _send_combined_digest(bot: Bot) -> None:
     for module_name in _ALL_MODULES:
         logger.info("[Scheduler] Scanning module: %s", module_name)
         try:
-            supervisor = SupervisorAgent(load_module(module_name))
-            ctx = await supervisor.quick_scan()
-            if ctx.top_items:
-                sections.append(_format_module_section(module_name, ctx.top_items))
+            runner = GraphRunner(module_name)
+            state = await runner.quick_scan()
+            top_items = state.get("top_items") or []
+            if top_items:
+                sections.append(_format_module_section(module_name, top_items))
             else:
                 logger.info("[Scheduler] No items for module '%s' — skipped from digest", module_name)
         except Exception as e:
