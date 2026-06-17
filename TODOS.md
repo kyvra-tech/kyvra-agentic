@@ -86,7 +86,6 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 **Effort:** M
 **Priority:** P1
 **Depends on:** T-001 through T-007 (develop PR landed)
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -96,7 +95,6 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 **Effort:** S
 **Priority:** P2
 **Depends on:** T-008 (same prompt pattern)
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -112,13 +110,11 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 ---
 
 ### T-011: Signal strength labels (replace raw confidence score in output) ✅ DONE
-**What:** In `interfaces/telegram/formatter.py`, replace `Score: 94/100` with a human-readable signal tier label + reason. Example: `🔥 VIRAL — 4 sources, trending 2h` or `📈 RISING — Anthropic official`.
 **Why:** Creators don't understand what "94/100" means. A label that explains *why* something is hot builds trust and makes the report feel smarter.
 **Context:** The data to compute the label already exists on `ScoredItem`: `confidence_score`, `is_spike`, `cross_source_count`, `authority_score`. Tiers: VIRAL (spike + cross-source), RISING (high score, recent), STEADY (RSS authority), SIGNAL (baseline).
 **Effort:** S
 **Priority:** P2
 **File:** `interfaces/telegram/formatter.py`
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -128,7 +124,6 @@ All T-001 through T-007 implemented in the `develop` branch PR.
 **Effort:** S
 **Priority:** P2
 **File:** `modules/tech/prompts.py`
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -173,7 +168,6 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 **Why:** For B2C product decisions, you need to know which commands users actually use, which topics they search, and how often. Structured logs enable grep-based analysis even without a dashboard.
 **Effort:** S
 **Priority:** P3
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 
@@ -194,7 +188,6 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 **Context:** All these functions are pure Python with no I/O — no mocking needed. Start with `pytest` + simple `RawItem` fixtures.
 **Effort:** M
 **Priority:** P2
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19) — 45 tests, all passing
 
 ---
 
@@ -221,7 +214,6 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 **Effort:** S
 **Priority:** P2
 **File:** `agents/narrative_scout.py` — pass `ctx.module.name` to select topic set
-**Completed:** fix/ollama-fallback-and-markdown-parse (2026-03-19)
 
 ---
 

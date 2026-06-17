@@ -51,27 +51,7 @@ echo "  Optional but recommended:"
 echo "    X_BEARER_TOKEN      — Twitter API key for better crypto/tech signal"
 echo ""
 
-# ── Ask LLM preference ───────────────────────────────────────────────────────
-echo -e "${BOLD}LLM provider:${RESET}"
-echo "  1) DeepSeek API (recommended — no GPU needed, very cheap)"
-echo "  2) Local Ollama  (free, but needs a decent machine)"
-echo ""
-read -rp "Choose [1/2, default 1]: " llm_choice
-llm_choice=${llm_choice:-1}
-
-if [ "$llm_choice" = "2" ]; then
-  COMPOSE_FILE="docker-compose.yml"
-  echo ""
-  echo -e "${YELLOW}Note: Ollama will pull the gemma3 model on first start (~5 GB download).${RESET}"
-  # Set Ollama URL for docker networking
-  sed -i.bak 's|^# CONTENT_LLM_PROVIDER=ollama|CONTENT_LLM_PROVIDER=ollama|' .env
-  sed -i.bak 's|^CONTENT_LLM_PROVIDER=deepseek|# CONTENT_LLM_PROVIDER=deepseek|' .env
-  sed -i.bak 's|^# OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://ollama:11434|' .env
-  sed -i.bak 's|^# OLLAMA_MODEL=.*|OLLAMA_MODEL=gemma3|' .env
-  rm -f .env.bak
-else
-  COMPOSE_FILE="docker-compose.deepseek.yml"
-fi
+COMPOSE_FILE="docker-compose.yml"
 
 # ── Open .env for editing ────────────────────────────────────────────────────
 echo ""
@@ -103,18 +83,7 @@ if [ "$missing" = "1" ]; then
   exit 1
 fi
 
-# ── Pull model if Ollama ─────────────────────────────────────────────────────
-if [ "$llm_choice" = "2" ]; then
-  echo ""
-  echo "Starting Ollama and pulling gemma3 model (this may take a few minutes)..."
-  docker compose -f docker-compose.yml up -d ollama
-  echo "Waiting for Ollama to be ready..."
-  until docker compose -f docker-compose.yml exec ollama curl -sf http://localhost:11434/api/tags &>/dev/null; do
-    sleep 2
-  done
-  docker compose -f docker-compose.yml exec ollama ollama pull gemma3
-  echo -e "${GREEN}✓ gemma3 model ready${RESET}"
-fi
+
 
 # ── Start ────────────────────────────────────────────────────────────────────
 echo ""

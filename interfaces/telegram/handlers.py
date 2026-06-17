@@ -82,7 +82,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         f"*Kyvra – AI Content Agent* (module: *{_active_module}*)\n"
-        f"Powered by Ollama (Gemma 3) + DeepSeek\n\n"
+        f"Powered by DeepSeek \n\n"
 
         "━━━ 📡 NEWS & INTEL ━━━\n"
         "⚡ */update* – Fast scan of latest news, no AI writing (~10 sec)\n"
