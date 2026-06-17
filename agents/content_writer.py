@@ -1,5 +1,5 @@
 from agents.base import BaseAgent, PipelineContext
-import services.llm as llm
+from services.llm_provider import get_content_provider
 
 
 class ContentWriterAgent(BaseAgent):
@@ -29,7 +29,7 @@ class ContentWriterAgent(BaseAgent):
         self._log(f"Calling LLM to write report ({len(ctx.top_items)} items)...")
 
         try:
-            ctx.report_text = await llm.complete(prompt, max_tokens=2000)
+            ctx.report_text = await get_content_provider().complete(prompt, max_tokens=2000)
             self._log("Report generated successfully.")
         except Exception as e:
             self._record_error(ctx, f"LLM call failed: {e}")
@@ -48,6 +48,6 @@ async def chat_with_llm(
         {"role": "user", "content": user_message}
     ]
     try:
-        return await llm.chat(messages, max_tokens=1000)
+        return await get_content_provider().chat(messages, max_tokens=1000)
     except Exception as e:
         return f"AI connection error. Please try again later."

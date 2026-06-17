@@ -115,7 +115,7 @@ class SupervisorAgent:
         user_id      — Telegram user ID; used to load voice profile from memory
         rank         — 1-based index into top_items by confidence_score (default: 1 = highest)
         """
-        import services.llm as llm
+        from services.llm_provider import get_content_provider
         logger.info("[Supervisor] %s generation started (rank=%d)...", format_name.capitalize(), rank)
         ctx = await self._collect_and_score()
 
@@ -135,7 +135,7 @@ class SupervisorAgent:
 
         prompt = get_prompt(payload, voice)
         try:
-            result = await llm.complete(prompt, max_tokens=max_tokens)
+            result = await get_content_provider().complete(prompt, max_tokens=max_tokens)
         except Exception as e:
             logger.error("[Supervisor] %s LLM call failed: %s", format_name, e)
             return f"Could not generate {format_name} right now. Try again later!"
@@ -206,7 +206,7 @@ class SupervisorAgent:
 
     async def generate_tweet_hook(self, rank: int = 1, lang: str = "en") -> str:
         """Generate a single viral tweet hook for story #rank in the given language (en|ja)."""
-        import services.llm as llm
+        from services.llm_provider import get_content_provider
 
         ctx = await self._collect_and_score()
         if not ctx.top_items:
@@ -217,14 +217,14 @@ class SupervisorAgent:
         prompt = self.module.get_tweet_hook_prompt(self._item_dict(item), lang=lang)
 
         try:
-            return await llm.complete(prompt, max_tokens=160)
+            return await get_content_provider().complete(prompt, max_tokens=160)
         except Exception as e:
             logger.error("[Supervisor] tweet_hook LLM call failed: %s", e)
             return "Could not generate tweet. Try again later."
 
     async def generate_newsletter_from_text(self, text: str, user_id: int | None = None) -> str:
         """Write a newsletter section directly from a pasted description or summary."""
-        import services.llm as llm
+        from services.llm_provider import get_content_provider
         voice = memory.get_voice_profile(user_id) if user_id is not None else None
         item = {
             "title": text[:80],
@@ -236,14 +236,14 @@ class SupervisorAgent:
         }
         prompt = self.module.get_newsletter_prompt(item, voice=voice)
         try:
-            return await llm.complete(prompt, max_tokens=800)
+            return await get_content_provider().complete(prompt, max_tokens=800)
         except Exception as e:
             logger.error("[Supervisor] newsletter_from_text LLM call failed: %s", e)
             return "Could not generate newsletter section right now. Try again later."
 
     async def generate_newsletter_from_url(self, url: str, user_id: int | None = None) -> str:
         """Fetch a URL, extract its content, and write a newsletter section from it."""
-        import services.llm as llm
+        from services.llm_provider import get_content_provider
         from utils.api_client import fetch_article
 
         article = await fetch_article(url)
@@ -261,7 +261,7 @@ class SupervisorAgent:
         }
         prompt = self.module.get_newsletter_prompt(item, voice=voice)
         try:
-            return await llm.complete(prompt, max_tokens=800)
+            return await get_content_provider().complete(prompt, max_tokens=800)
         except Exception as e:
             logger.error("[Supervisor] newsletter_from_url LLM call failed: %s", e)
             return "Could not generate newsletter section right now. Try again later."
