@@ -84,10 +84,11 @@ class GraphRunner:
             mode=mode,
             topic_filter=topic_filter,
         )
-        final_state: KyvraState | None = None
+        final_state = initial.copy()
         async for event in kyvra_graph.astream(initial):
             for node_name, node_state in event.items():
-                final_state = node_state if isinstance(node_state, dict) else final_state
+                if isinstance(node_state, dict):
+                    final_state.update(node_state)
                 yield node_name, None
         yield "__end__", final_state
 

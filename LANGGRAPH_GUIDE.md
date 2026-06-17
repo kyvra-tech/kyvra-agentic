@@ -913,10 +913,11 @@ async def stream_events(self, mode="full", ...) -> AsyncIterator[tuple[str, Kyvr
     """Yields (node_name, None) for each completed node,
        then ("__end__", final_state) when done."""
 
-    final_state = None
+    final_state = initial.copy()
     async for event in kyvra_graph.astream(initial):
         for node_name, node_state in event.items():
-            final_state = node_state if isinstance(node_state, dict) else final_state
+            if isinstance(node_state, dict):
+                final_state.update(node_state)
             yield node_name, None           # progress signal
 
     yield "__end__", final_state            # done signal with final state
