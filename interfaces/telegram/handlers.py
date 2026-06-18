@@ -463,14 +463,14 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if voice.lower() == "clear":
         memory.save_voice_profile(user_id, "")
         logger.info(f"[Analytics] user={user_id} command=setvoice action=clear")
-        await update.message.reply_text("🗑 Voice profile cleared.")
+        await update.message.reply_text("🗑 Global voice profile cleared.")
         return
 
     memory.save_voice_profile(user_id, voice)
     logger.info(f"[Analytics] user={user_id} command=setvoice action=set")
     await update.message.reply_text(
-        f"✅ Voice profile saved!\n\n_{voice}_\n\n"
-        "All content formats (/thread, /brief, /newsletter, /script) will now use your voice.",
+        f"✅ Global voice profile saved to `voice.md`!\n\n_{voice}_\n\n"
+        "All automated content and commands will now use this voice.",
     )
 
 
