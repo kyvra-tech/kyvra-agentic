@@ -5,7 +5,7 @@ from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
 from agents.graph_runner import GraphRunner
 from interfaces.telegram.formatter import split_long_message, _signal_label_key
-from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE
+from config import REPORT_TIME, REPORT_CHAT_IDS, TIMEZONE, ACTIVE_MODULE
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,37 @@ def _format_module_section(module_name: str, top_items: list) -> str:
         lines.append(f"  {i}\\. [{score}] {title}")
         lines.append(f"     {item.url}")
     return "\n".join(lines)
+
+
+async def _send_predrafted_content(bot: Bot) -> None:
+    """
+    Generate and send a pre-drafted thread, brief, and script for the top story
+    of the ACTIVE_MODULE to all configured REPORT_CHAT_IDS, using the global voice.
+    """
+    if not REPORT_CHAT_IDS:
+        return
+
+    logger.info("[Scheduler] Generating pre-drafted content for ACTIVE_MODULE: %s", ACTIVE_MODULE)
+    runner = GraphRunner(ACTIVE_MODULE)
+    
+    try:
+        # Use user_id=0 to trigger voice profile loading (which is global now)
+        thread = await runner.generate_thread(user_id=0, rank=1)
+        brief = await runner.generate_brief(user_id=0, rank=1)
+        script = await runner.generate_script(user_id=0, rank=1)
+        
+        header = f"✨ *Auto-Drafts for Top Story ({ACTIVE_MODULE})*\n_Ready to post in your voice_\n\n"
+        
+        for chat_id in REPORT_CHAT_IDS:
+            try:
+                await bot.send_message(chat_id=chat_id, text=header + "🧵 *Twitter Thread*\n" + thread, parse_mode="Markdown")
+                await bot.send_message(chat_id=chat_id, text="📝 *Quick Brief*\n" + brief, parse_mode="Markdown")
+                await bot.send_message(chat_id=chat_id, text="🎬 *Video Script*\n" + script, parse_mode="Markdown")
+                logger.info("[Scheduler] Sent predrafts to %s", chat_id)
+            except Exception as e:
+                logger.error("[Scheduler] Failed to send predrafts to %s: %s", chat_id, e)
+    except Exception as e:
+        logger.error("[Scheduler] Failed to generate predrafts: %s", e)
 
 
 async def _send_combined_digest(bot: Bot) -> None:
@@ -85,6 +116,9 @@ async def _send_combined_digest(bot: Bot) -> None:
             logger.info("[Scheduler] Combined digest sent to %s", chat_id)
         except Exception as e:
             logger.error("[Scheduler] Failed to send digest to %s: %s", chat_id, e)
+
+    # Automatically send the pre-drafted content right after the morning digest
+    await _send_predrafted_content(bot)
 
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:

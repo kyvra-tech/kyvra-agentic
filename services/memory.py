@@ -19,13 +19,7 @@ def init_db() -> None:
     """Create tables if they don't exist. Safe to call on every startup."""
     try:
         with _connect() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS user_voices (
-                    user_id   INTEGER PRIMARY KEY,
-                    voice     TEXT    NOT NULL,
-                    updated_at TEXT   NOT NULL DEFAULT (datetime('now'))
-                )
-            """)
+            # Note: user_voices table is removed in favor of global voice.md
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS seen_items (
                     url        TEXT    NOT NULL,
@@ -59,35 +53,30 @@ def init_db() -> None:
         raise
 
 
+VOICE_FILE = Path("voice.md")
+
 def save_voice_profile(user_id: int, voice: str) -> None:
-    """Upsert a user's voice/style description."""
+    """Save the global voice/style description to voice.md (user_id is ignored)."""
     try:
-        with _connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO user_voices (user_id, voice, updated_at)
-                VALUES (?, ?, datetime('now'))
-                ON CONFLICT(user_id) DO UPDATE SET
-                    voice = excluded.voice,
-                    updated_at = excluded.updated_at
-                """,
-                (user_id, voice),
-            )
-            conn.commit()
-    except sqlite3.OperationalError as e:
-        logger.error("[Memory] Failed to save voice profile for user %s: %s", user_id, e)
+        if not voice:
+            if VOICE_FILE.exists():
+                VOICE_FILE.unlink()
+            logger.info("[Memory] Cleared global voice profile (voice.md deleted).")
+        else:
+            VOICE_FILE.write_text(voice, encoding="utf-8")
+            logger.info("[Memory] Saved global voice profile to %s", VOICE_FILE)
+    except Exception as e:
+        logger.error("[Memory] Failed to save global voice profile: %s", e)
 
 
 def get_voice_profile(user_id: int) -> str | None:
-    """Return the user's saved voice description, or None if not set."""
+    """Return the global voice description from voice.md, or None if not set."""
     try:
-        with _connect() as conn:
-            row = conn.execute(
-                "SELECT voice FROM user_voices WHERE user_id = ?", (user_id,)
-            ).fetchone()
-            return row["voice"] if row else None
-    except sqlite3.OperationalError as e:
-        logger.error("[Memory] Failed to load voice profile for user %s: %s", user_id, e)
+        if VOICE_FILE.exists():
+            return VOICE_FILE.read_text(encoding="utf-8").strip()
+        return None
+    except Exception as e:
+        logger.error("[Memory] Failed to load global voice profile: %s", e)
         return None
 
 
