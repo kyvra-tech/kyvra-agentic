@@ -152,3 +152,30 @@ def record_performance_signal(user_id: int, story_url: str, delta: float, date_u
     except sqlite3.OperationalError as e:
         logger.error("[Memory] record_performance_signal failed: %s", e)
         return False
+
+
+def get_source_performance(days: int = 30) -> dict[str, float]:
+    """Return average performance delta per source from the last N days.
+
+    Joins performance_signals with seen_items to map story_url → source name.
+    Returns a dict of {source_name: avg_delta} for sources that have signals.
+    Used by the analyst node to boost/penalize sources based on real engagement.
+    """
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT si.source, AVG(ps.delta) as avg_delta, COUNT(*) as n
+                FROM performance_signals ps
+                JOIN seen_items si ON ps.story_url = si.url
+                WHERE ps.date_utc >= date('now', ?)
+                GROUP BY si.source
+                HAVING n >= 2
+                """,
+                (f"-{days} days",),
+            ).fetchall()
+            return {row["source"]: round(row["avg_delta"], 2) for row in rows}
+    except sqlite3.OperationalError as e:
+        logger.warning("[Memory] get_source_performance failed, returning empty: %s", e)
+        return {}
+

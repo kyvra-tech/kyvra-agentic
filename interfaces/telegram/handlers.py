@@ -497,8 +497,7 @@ async def handle_video_link(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Check if message looks like a URL (starts with http)
     if not text.startswith("http"):
-        # Fall through to STOP handler
-        await handle_stop_message(update, context)
+        # Not a URL — silently ignore (no matching command handler)
         return
 
     await _handle_video_url(update, text)
