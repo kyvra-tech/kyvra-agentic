@@ -21,6 +21,7 @@ from agents.state import KyvraState
 from agents.registry import load_module
 from modules.base import RawItem
 from config import MAX_REPORT_ITEMS
+import services.memory as memory
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +109,29 @@ def _is_spike(item: RawItem, github_threshold: int, x_threshold: int) -> bool:
     )
 
 
+def _performance_score(item: RawItem, source_perf: dict[str, float]) -> int:
+    """Score based on historical performance signals for this source.
+
+    Reads avg_delta from the performance_signals table (via get_source_performance).
+    Maps the average delta [-5, +5] to a score of [-5, +10].
+    Sources with no history get 0 (neutral).
+    """
+    avg_delta = source_perf.get(item.source)
+    if avg_delta is None:
+        return 0
+    # Map [-5, +5] delta → [-5, +10] score
+    #   avg_delta = +5  →  +10 (best performing source)
+    #   avg_delta =  0  →    0 (neutral)
+    #   avg_delta = -5  →   -5 (worst performing source)
+    return max(-5, min(10, round(avg_delta * 2)))
+
+
 def score_item(
     item: RawItem,
     keywords: list[str],
     github_threshold: int = 100,
     x_threshold: int = 500,
+    source_perf: dict[str, float] | None = None,
 ) -> ScoredItem:
     engagement  = _engagement_score(item)
     authority   = item.authority_score
@@ -120,8 +139,9 @@ def score_item(
     relevance   = _relevance_score(item, keywords)
     cross_boost = _cross_source_boost(item)
     velocity    = _velocity_score(item)
+    perf        = _performance_score(item, source_perf or {})
 
-    confidence = min(100, engagement + authority + recency + relevance + cross_boost + velocity)
+    confidence = min(100, max(0, engagement + authority + recency + relevance + cross_boost + velocity + perf))
 
     return ScoredItem(
         title=item.title,
@@ -149,8 +169,13 @@ async def run(state: KyvraState) -> dict:
     keywords = [kw.lower() for kw in module.get_keywords()]
     github_threshold, x_threshold = module.get_spike_thresholds()
 
+    # Load historical performance data for the feedback loop
+    source_perf = memory.get_source_performance(days=30)
+    if source_perf:
+        logger.info("[analyst] Feedback loop active — %d sources have performance history", len(source_perf))
+
     scored = sorted(
-        [score_item(item, keywords, github_threshold, x_threshold) for item in raw_items],
+        [score_item(item, keywords, github_threshold, x_threshold, source_perf) for item in raw_items],
         key=lambda x: (x.is_spike, x.confidence_score),
         reverse=True,
     )

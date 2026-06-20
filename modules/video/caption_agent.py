@@ -29,7 +29,18 @@ async def generate_twitter_caption(
     url: str,
 ) -> str:
     """Generate a single viral Twitter/X caption ready to copy-paste."""
+    import services.memory as memory
+
     prompt = build_twitter_caption_prompt(title, description, transcript, url)
+
+    # Inject global voice profile
+    voice = memory.get_voice_profile(0)
+    if voice:
+        prompt += f"\n\nVoice profile (write in this style): {voice}"
+
+    # Inject language preference
+    prompt += memory.get_language_instruction()
+
     try:
         response = await _get_client().chat.completions.create(
             model=DEEPSEEK_MODEL,

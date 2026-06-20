@@ -224,6 +224,13 @@ docker compose -f docker-compose.deepseek.yml up -d
 git pull
 ```
 
+**Reloading Docker (if you have local changes or updates):**
+
+```bash
+docker compose -f docker-compose.deepseek.yml down
+docker compose -f docker-compose.deepseek.yml up -d --build
+```
+
 ### Environment variables
 
 **Required:**
