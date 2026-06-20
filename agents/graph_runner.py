@@ -171,7 +171,7 @@ class GraphRunner:
             return "No stories available right now."
         item = top[max(0, min(rank, len(top)) - 1)]
         prompt = self._module.get_tweet_hook_prompt(
-            {"title": item.title, "url": item.url, "summary": item.summary}, lang=lang
+            {"title": item.title, "url": item.url, "source": item.source, "summary": item.summary}, lang=lang
         )
         # Inject voice for tweet hooks too
         voice = memory.get_voice_profile(0)
