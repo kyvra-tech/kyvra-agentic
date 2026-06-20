@@ -110,6 +110,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "━━━ ⚙️ SETTINGS ━━━\n"
         "🎙 */setvoice \\[description\\]* – Save your writing style for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
+        "🌐 */lang \\[en|ja\\]* – Set output language (English or Japanese)\n"
         "🧩 */module \\[name\\]* – Switch focus module\n"
         "   tech \\| crypto \\| vietnam \\| indie \\| parody \\| sport \\| political \\| war\n"
 
@@ -471,6 +472,41 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(
         f"✅ Global voice profile saved to `voice.md`!\n\n_{voice}_\n\n"
         "All automated content and commands will now use this voice.",
+    )
+
+
+async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/lang [en|ja] — set the global output language."""
+    user_id = update.effective_user.id
+    requested = context.args[0].lower().strip() if context.args else ""
+
+    if not requested:
+        current = memory.get_language()
+        label = memory.SUPPORTED_LANGUAGES.get(current, current)
+        options = " | ".join(f"`{k}` ({v})" for k, v in memory.SUPPORTED_LANGUAGES.items())
+        await update.message.reply_text(
+            f"🌐 Current language: *{label}*\n\n"
+            f"Available: {options}\n\n"
+            "Usage: `/lang ja` to switch to Japanese",
+            parse_mode="Markdown",
+        )
+        return
+
+    if requested not in memory.SUPPORTED_LANGUAGES:
+        options = " | ".join(f"`{k}`" for k in memory.SUPPORTED_LANGUAGES)
+        await update.message.reply_text(
+            f"❌ Unknown language: `{requested}`\n\nAvailable: {options}",
+            parse_mode="Markdown",
+        )
+        return
+
+    memory.save_language(requested)
+    label = memory.SUPPORTED_LANGUAGES[requested]
+    logger.info(f"[Analytics] user={user_id} command=lang lang={requested}")
+    await update.message.reply_text(
+        f"✅ Language set to *{label}*\n\n"
+        "All content (reports, threads, briefs, scripts, captions) will now be generated in this language.",
+        parse_mode="Markdown",
     )
 
 

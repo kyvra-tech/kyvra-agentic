@@ -79,6 +79,48 @@ def get_voice_profile(user_id: int) -> str | None:
         logger.error("[Memory] Failed to load global voice profile: %s", e)
         return None
 
+# ── Language preference (global, file-based) ──────────────────────────────────
+
+LANG_FILE = Path("lang.txt")
+SUPPORTED_LANGUAGES = {"en": "English", "ja": "Japanese (日本語)"}
+DEFAULT_LANGUAGE = "en"
+
+
+def save_language(lang: str) -> None:
+    """Save the global language preference to lang.txt."""
+    lang = lang.strip().lower()
+    if lang not in SUPPORTED_LANGUAGES:
+        logger.warning("[Memory] Unsupported language '%s', defaulting to 'en'", lang)
+        lang = DEFAULT_LANGUAGE
+    try:
+        LANG_FILE.write_text(lang, encoding="utf-8")
+        logger.info("[Memory] Saved global language preference: %s", lang)
+    except Exception as e:
+        logger.error("[Memory] Failed to save language preference: %s", e)
+
+
+def get_language() -> str:
+    """Return the global language code ('en' or 'ja'). Defaults to 'en'."""
+    try:
+        if LANG_FILE.exists():
+            lang = LANG_FILE.read_text(encoding="utf-8").strip().lower()
+            return lang if lang in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
+        return DEFAULT_LANGUAGE
+    except Exception as e:
+        logger.error("[Memory] Failed to load language preference: %s", e)
+        return DEFAULT_LANGUAGE
+
+
+def get_language_instruction(lang: str | None = None) -> str:
+    """Return a prompt instruction block for the given language.
+
+    Returns empty string for English (default), explicit instruction for JA.
+    """
+    lang = lang or get_language()
+    if lang == "ja":
+        return "\n\nIMPORTANT: Write the ENTIRE output in Japanese (日本語). Use natural, fluent Japanese."
+    return ""
+
 
 # ── Seen-item tracking (story continuity / Phase 1) ───────────────────────────
 

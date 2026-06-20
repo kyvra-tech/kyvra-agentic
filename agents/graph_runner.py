@@ -139,6 +139,12 @@ class GraphRunner:
             for i in top[:7]
         ]
         prompt = self._module.get_report_prompt(enriched)
+        # Inject voice + language
+        # Prepend voice so it doesn't override strict format instructions at the end of the prompt
+        voice = memory.get_voice_profile(0)
+        if voice:
+            prompt = f"Voice profile (write in this style): {voice}\n\n" + prompt
+        prompt += memory.get_language_instruction()
         try:
             return await get_content_provider().complete(prompt, max_tokens=2000)
         except Exception as e:
@@ -157,7 +163,8 @@ class GraphRunner:
     async def generate_script(self, user_id: int | None = None, rank: int = 1) -> str:
         return await self._content_format("script", rank=rank, user_id=user_id)
 
-    async def generate_tweet_hook(self, rank: int = 1, lang: str = "en") -> str:
+    async def generate_tweet_hook(self, rank: int = 1, lang: str | None = None) -> str:
+        lang = lang or memory.get_language()
         state = await self._run("quick")
         top = state.get("top_items") or []
         if not top:
@@ -166,6 +173,10 @@ class GraphRunner:
         prompt = self._module.get_tweet_hook_prompt(
             {"title": item.title, "url": item.url, "summary": item.summary}, lang=lang
         )
+        # Inject voice for tweet hooks too
+        voice = memory.get_voice_profile(0)
+        if voice:
+            prompt += f"\n\nVoice profile (write in this style): {voice}"
         try:
             return await get_content_provider().complete(prompt, max_tokens=160)
         except Exception as e:
@@ -219,7 +230,7 @@ class GraphRunner:
         if not top:
             return f"No news today to build a {fmt} from. Try again later!"
 
-        voice = memory.get_voice_profile(user_id) if user_id is not None else None
+        voice = memory.get_voice_profile(0)  # global voice
         clamped = max(0, min(rank, len(top)) - 1)
         selected = {"title": top[clamped].title, "url": top[clamped].url,
                     "source": top[clamped].source, "summary": top[clamped].summary,
@@ -245,6 +256,9 @@ class GraphRunner:
             prompt = self._module.get_script_prompt(selected, voice=voice)
         else:
             return f"Unknown format: {fmt}"
+
+        # Inject language instruction
+        prompt += memory.get_language_instruction()
 
         try:
             return await get_content_provider().complete(prompt, max_tokens=max_tokens)

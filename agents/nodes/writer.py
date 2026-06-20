@@ -56,6 +56,12 @@ async def run(state: KyvraState) -> dict:
     module = load_module(module_name)
     max_tokens = _MAX_TOKENS.get(fmt, 2000)
 
+    # Load global voice and language preference
+    voice = memory.get_voice_profile(0)
+    lang = state.get("lang") or memory.get_language()
+    voice_block = f"\n\nVoice profile (write in this style): {voice}" if voice else ""
+    lang_block = memory.get_language_instruction(lang)
+
     # Build enriched payload for the prompt
     enriched = [
         {**_item_dict(item), "trend_heatmap": trend_heatmap}
@@ -70,23 +76,33 @@ async def run(state: KyvraState) -> dict:
         if fmt == "report":
             prompt = module.get_report_prompt(enriched)
         elif fmt == "thread":
-            prompt = module.get_thread_prompt(selected)
+            prompt = module.get_thread_prompt(selected, voice=voice)
         elif fmt == "brief":
             payload = [_item_dict(i) for i in top_items[:3]]
-            prompt = module.get_brief_prompt(payload)
+            prompt = module.get_brief_prompt(payload, voice=voice)
         elif fmt == "newsletter":
-            prompt = module.get_newsletter_prompt(selected)
+            prompt = module.get_newsletter_prompt(selected, voice=voice)
         elif fmt == "script":
-            prompt = module.get_script_prompt(selected)
+            prompt = module.get_script_prompt(selected, voice=voice)
         else:
             prompt = module.get_report_prompt(enriched)
+
+        # Inject voice into formats that don't accept it natively (report)
+        # Prepend voice so it doesn't override the strict formatting instructions at the end of the prompt
+        if fmt in ("report",) and voice_block:
+            prompt = voice_block.strip() + "\n\n" + prompt
+
+        # Inject language instruction for all formats
+        if lang_block:
+            prompt += lang_block
+
     except Exception as e:
         msg = f"writer: prompt build failed: {e}"
         errors.append(msg)
         logger.error("[writer] %s", msg)
         return {"report_text": "Could not generate content right now. Try again later! 🤷", "errors": errors}
 
-    logger.info("[writer] Calling LLM (format=%s, items=%d, max_tokens=%d)...", fmt, len(top_items), max_tokens)
+    logger.info("[writer] Calling LLM (format=%s, items=%d, max_tokens=%d, lang=%s)...", fmt, len(top_items), max_tokens, lang)
 
     try:
         from services.llm_provider import get_content_provider
