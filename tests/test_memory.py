@@ -28,10 +28,14 @@ class TestInitDb:
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         assert "seen_items" in tables
 
-    def test_creates_user_voices_table(self, isolated_db):
-        conn = sqlite3.connect(isolated_db)
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-        assert "user_voices" in tables
+    def test_voice_profile_file_operations(self, tmp_path):
+        test_voice_file = tmp_path / "test_voice.md"
+        with patch.object(memory, "VOICE_FILE", test_voice_file):
+            assert memory.get_voice_profile(123) is None
+            memory.save_voice_profile(123, "Test Voice")
+            assert memory.get_voice_profile(123) == "Test Voice"
+            memory.save_voice_profile(123, "")
+            assert memory.get_voice_profile(123) is None
 
     def test_idempotent(self, isolated_db):
         # Calling init_db again should not raise

@@ -145,7 +145,7 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ---
 
-### T-015: asyncio launcher pattern in main.py
+### T-015: asyncio launcher pattern in main.py ✅ DONE
 **What:** Refactor `main.py` to use an explicit `asyncio.run(main_async())` pattern with `asyncio.gather()` over interface tasks, rather than `Application.run_polling()` blocking the main thread.
 **Why:** `python-telegram-bot` and `discord.py` both want to own the event loop. When Discord ships, this refactor is required anyway — doing it now is 15 lines and prevents a structural rewrite.
 **Effort:** S
@@ -173,7 +173,7 @@ Replaced if/elif with a dict registry in `agents/supervisor.py`. Adding a new mo
 
 ## Phase 4 — B2B / Scale
 
-### T-018: Job queue for concurrent /report requests
+### T-018: Job queue for concurrent /report requests ✅ DONE
 **What:** When multiple users send `/report` simultaneously, N pipeline runs execute in parallel — each hitting the same sources. At scale, this means N×7 concurrent API calls to X/GitHub/RSS. An asyncio.Queue with a worker pool (max 2 concurrent pipelines) prevents rate-limit cascades.
 **Why:** Not a problem for personal use. Becomes a problem at 50+ concurrent users.
 **Effort:** L
@@ -219,7 +219,7 @@ Clears chat history on switch (stale context). `/module` with no args shows curr
 
 ## Phase 4 — Content personalisation
 
-### T-023: Story rank picker for content format commands
+### T-023: Story rank picker for content format commands ✅ DONE
 **What:** Add an optional rank argument to `/thread`, `/newsletter`, `/script`. E.g. `/thread 2` generates a thread from the #2 scored story instead of #1. Default remains 1. Cap at 7 (MAX_REPORT_ITEMS).
 **Why:** Users often know which story they want to work with — always using #1 removes agency. Power users will hit this immediately.
 **Pros:** Tiny change (~10 lines in handlers + supervisor). Big UX improvement for repeat users.

@@ -141,6 +141,12 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         async for node_name, state in runner.stream_events(mode="full"):
             if node_name == "__end__":
                 final_state = state
+            elif node_name.startswith("queue:"):
+                pos = node_name.split(":")[1]
+                try:
+                    await msg.edit_text(f"⏳ Queued (position {pos})... waiting for slot.")
+                except Exception:
+                    pass
             elif node_name in _STREAM_LABELS:
                 try:
                     await msg.edit_text(_STREAM_LABELS[node_name])
