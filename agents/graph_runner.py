@@ -19,6 +19,7 @@ handlers.py can call when it wants live Telegram progress updates.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import Counter
@@ -29,8 +30,12 @@ from agents.registry import load_module
 from agents.state import KyvraState, empty_state
 import services.memory as memory
 from services.llm_provider import get_content_provider
+from utils.job_queue import PipelineQueue
 
 logger = logging.getLogger(__name__)
+
+# Global job queue to serialize/limit parallel pipeline executions (T-018)
+pipeline_queue = PipelineQueue(max_concurrent=2)
 
 # Status cache (same as SupervisorAgent._STATUS_CACHE — shared via module name key)
 _STATUS_CACHE: dict[str, dict] = {}
@@ -51,15 +56,21 @@ class GraphRunner:
     async def _run(self, mode: str, topic_filter: str | None = None,
                    content_format: str = "report", content_rank: int = 1) -> KyvraState:
         """Run the full LangGraph pipeline and return the final state."""
-        initial = empty_state(
-            module_name=self.module_name,
-            mode=mode,
-            topic_filter=topic_filter,
-            content_format=content_format,
-            content_rank=content_rank,
-        )
-        result: KyvraState = await kyvra_graph.ainvoke(initial)
-        return result
+        job_name = f"{self.module_name}:{mode}"
+        job, pos = await pipeline_queue.enqueue(job_name)
+        try:
+            await pipeline_queue.wait_for_turn(job)
+            initial = empty_state(
+                module_name=self.module_name,
+                mode=mode,
+                topic_filter=topic_filter,
+                content_format=content_format,
+                content_rank=content_rank,
+            )
+            result: KyvraState = await kyvra_graph.ainvoke(initial)
+            return result
+        finally:
+            await pipeline_queue.complete(job)
 
     # ------------------------------------------------------------------
     # Streaming: yields node labels as they complete (for Telegram progress)
@@ -79,18 +90,51 @@ class GraphRunner:
                     await msg.edit_text(PROGRESS_LABELS[node])
             # state is the final KyvraState
         """
-        initial = empty_state(
-            module_name=self.module_name,
-            mode=mode,
-            topic_filter=topic_filter,
-        )
-        final_state = initial.copy()
-        async for event in kyvra_graph.astream(initial):
-            for node_name, node_state in event.items():
-                if isinstance(node_state, dict):
-                    final_state.update(node_state)
-                yield node_name, None
-        yield "__end__", final_state
+        job_name = f"{self.module_name}:{mode}:stream"
+        job, pos = await pipeline_queue.enqueue(job_name)
+
+        queue_yields = asyncio.Queue()
+
+        async def progress_callback(position: int):
+            await queue_yields.put(f"queue:{position}")
+
+        # Start waiting in a background task so we can yield from queue_yields
+        wait_task = asyncio.create_task(pipeline_queue.wait_for_turn(job, progress_callback))
+
+        try:
+            while not job.event.is_set():
+                try:
+                    get_task = asyncio.create_task(queue_yields.get())
+                    event_task = asyncio.create_task(job.event.wait())
+                    done, pending = await asyncio.wait(
+                        [get_task, event_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for t in pending:
+                        t.cancel()
+                    for t in done:
+                        if t == get_task:
+                            yield t.result(), None
+                except asyncio.CancelledError:
+                    raise
+
+            # Now run the graph
+            initial = empty_state(
+                module_name=self.module_name,
+                mode=mode,
+                topic_filter=topic_filter,
+            )
+            final_state = initial.copy()
+            async for event in kyvra_graph.astream(initial):
+                for node_name, node_state in event.items():
+                    if isinstance(node_state, dict):
+                        final_state.update(node_state)
+                    yield node_name, None
+            yield "__end__", final_state
+        finally:
+            if not wait_task.done():
+                wait_task.cancel()
+            await pipeline_queue.complete(job)
 
     # ------------------------------------------------------------------
     # SupervisorAgent-compatible public API

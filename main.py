@@ -25,17 +25,8 @@ def validate_config() -> None:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in .env")
 
 
-def main() -> None:
+async def main_async() -> None:
     validate_config()
-
-    if "--once" in sys.argv:
-        async def run_once():
-            from agents.graph_runner import GraphRunner
-            runner = GraphRunner(ACTIVE_MODULE)
-            report = await runner.generate_report()
-            print(report)
-        asyncio.run(run_once())
-        return
 
     logger.info("Starting Kyvra bot...")
 
@@ -72,8 +63,43 @@ def main() -> None:
     scheduler.start()
     logger.info(f"[Startup] Active module: {ACTIVE_MODULE}, sources: {len(load_module(ACTIVE_MODULE).get_sources())}")
 
-    logger.info("Bot is running. Press Ctrl+C to stop.")
-    app.run_polling(drop_pending_updates=True)
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+        logger.info("Bot is running. Press Ctrl+C to stop.")
+        
+        try:
+            stop_event = asyncio.Event()
+            await stop_event.wait()
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logger.info("Shutdown signal received.")
+        finally:
+            logger.info("Stopping scheduler...")
+            scheduler.shutdown(wait=False)
+            logger.info("Stopping bot polling...")
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+            logger.info("Kyvra bot stopped successfully.")
+
+
+def main() -> None:
+    validate_config()
+
+    if "--once" in sys.argv:
+        async def run_once():
+            from agents.graph_runner import GraphRunner
+            runner = GraphRunner(ACTIVE_MODULE)
+            report = await runner.generate_report()
+            print(report)
+        asyncio.run(run_once())
+        return
+
+    try:
+        asyncio.run(main_async())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":

@@ -194,10 +194,11 @@ async def topic(
 async def brief(
     module: str = Depends(_module_param),
     user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
+    rank: int = Query(1, ge=1, le=7, description="Story rank to generate content from"),
 ) -> TextResponse:
-    """3-bullet shareable brief from today's top 3 stories."""
+    """3-bullet shareable brief from today's top stories."""
     sv = _runner(module)
-    result = await sv.generate_brief(user_id=user_id)
+    result = await sv.generate_brief(user_id=user_id, rank=rank)
     return TextResponse(module=module, result=result)
 
 
@@ -205,10 +206,11 @@ async def brief(
 async def thread(
     module: str = Depends(_module_param),
     user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
+    rank: int = Query(1, ge=1, le=7, description="Story rank to generate content from"),
 ) -> TextResponse:
     """7-tweet Twitter/X thread from today's top story."""
     sv = _runner(module)
-    result = await sv.generate_thread(user_id=user_id)
+    result = await sv.generate_thread(user_id=user_id, rank=rank)
     return TextResponse(module=module, result=result)
 
 
@@ -216,10 +218,11 @@ async def thread(
 async def newsletter(
     module: str = Depends(_module_param),
     user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
+    rank: int = Query(1, ge=1, le=7, description="Story rank to generate content from"),
 ) -> TextResponse:
     """Newsletter section from today's top story."""
     sv = _runner(module)
-    result = await sv.generate_newsletter(user_id=user_id)
+    result = await sv.generate_newsletter(user_id=user_id, rank=rank)
     return TextResponse(module=module, result=result)
 
 
@@ -227,10 +230,11 @@ async def newsletter(
 async def script(
     module: str = Depends(_module_param),
     user_id: Optional[int] = Query(None, description="User ID for voice profile lookup"),
+    rank: int = Query(1, ge=1, le=7, description="Story rank to generate content from"),
 ) -> TextResponse:
     """TikTok/Reels voiceover script from today's top story."""
     sv = _runner(module)
-    result = await sv.generate_script(user_id=user_id)
+    result = await sv.generate_script(user_id=user_id, rank=rank)
     return TextResponse(module=module, result=result)
 
 
