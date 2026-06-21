@@ -70,9 +70,6 @@ jobs:
           git fetch origin
           git reset --hard origin/main
 
-          echo "📥 Installing dependencies..."
-          venv/bin/pip install -r requirements.txt
-
           echo "⚙️  Writing .env..."
           {
             echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}"
@@ -86,9 +83,10 @@ jobs:
             echo "X_BEARER_TOKEN=${{ secrets.X_BEARER_TOKEN }}"
           } > .env
 
-          echo "🔄 Restarting service..."
-          sudo systemctl restart kyvra-bot
+          echo "🔄 Rebuilding and restarting Docker containers..."
+          docker compose down
+          docker compose up -d --build
 
           echo "✅ Deployment complete!"
-          sudo systemctl status kyvra-bot --no-pager
+          docker compose ps
           EOF
