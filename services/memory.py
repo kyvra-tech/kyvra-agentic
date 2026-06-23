@@ -25,10 +25,18 @@ def init_db() -> None:
                     url        TEXT    NOT NULL,
                     module     TEXT    NOT NULL,
                     title      TEXT    NOT NULL DEFAULT '',
+                    source     TEXT    NOT NULL DEFAULT '',
                     seen_at    TEXT    NOT NULL DEFAULT (datetime('now')),
                     PRIMARY KEY (url, module)
                 )
             """)
+            # Check if columns exist in seen_items
+            cursor = conn.execute("PRAGMA table_info(seen_items)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "source" not in columns:
+                conn.execute("ALTER TABLE seen_items ADD COLUMN source TEXT NOT NULL DEFAULT ''")
+            if "title" not in columns:
+                conn.execute("ALTER TABLE seen_items ADD COLUMN title TEXT NOT NULL DEFAULT ''")
             # Analytics feedback loop: one signal per (user_id, story_url) per UTC calendar day
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS seen_signals (
@@ -145,21 +153,35 @@ def get_seen_urls(module: str, days: int = 7) -> set[str]:
         return set()
 
 
-def mark_seen(urls: list[str], module: str) -> None:
-    """Record URLs as seen for this module. Duplicate-safe (REPLACE)."""
-    if not urls:
+def mark_seen(items: list[str] | list[Any], module: str) -> None:
+    """Record URLs or ScoredItem/dict objects as seen for this module. Duplicate-safe (REPLACE)."""
+    if not items:
         return
+    rows = []
+    for item in items:
+        if isinstance(item, str):
+            rows.append((item, "", ""))
+        else:
+            url = str(getattr(item, "url", "") or "")
+            source = str(getattr(item, "source", "") or "")
+            title = str(getattr(item, "title", "") or "")
+            if not url and isinstance(item, dict):
+                url = str(item.get("url", "") or "")
+                source = str(item.get("source", "") or "")
+                title = str(item.get("title", "") or "")
+            rows.append((url, source, title))
+
     try:
         with _connect() as conn:
             conn.executemany(
                 """
-                INSERT OR REPLACE INTO seen_items (url, module, seen_at)
-                VALUES (?, ?, datetime('now'))
+                INSERT OR REPLACE INTO seen_items (url, module, source, title, seen_at)
+                VALUES (?, ?, ?, ?, datetime('now'))
                 """,
-                [(url, module) for url in urls],
+                [(r[0], module, r[1], r[2]) for r in rows],
             )
             conn.commit()
-        logger.info("[Memory] Marked %d items as seen for module '%s'", len(urls), module)
+        logger.info("[Memory] Marked %d items as seen for module '%s'", len(items), module)
     except sqlite3.OperationalError as e:
         logger.warning("[Memory] mark_seen failed (report still delivered): %s", e)
 
