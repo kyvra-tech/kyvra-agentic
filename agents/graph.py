@@ -95,14 +95,20 @@ def build_graph(checkpointer=None):
     # 2. collect → conditional: empty items → END, else → analyst + scout
     g.add_conditional_edges(
         "collect",
-        router.after_collect,
+        lambda state: router.after_collect(state),
         {
             "empty": END,    # nothing fetched — short-circuit
             "score": "analyst",
         },
     )
-    # Also fan-out collect → scout (parallel with analyst)
-    g.add_edge("collect", "scout")
+    g.add_conditional_edges(
+        "collect",
+        router.after_collect,
+        {
+            "empty": END,
+            "score": "scout",
+        },
+    )
 
     # 3. analyst → join  (fan-in waits for both)
     g.add_edge("analyst", "join")

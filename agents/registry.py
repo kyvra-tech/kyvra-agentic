@@ -16,6 +16,8 @@ def load_module(module_name: str):
     """Return an instantiated BaseModule for the given name."""
     from modules.tech.sources import TechModule
     from modules.crypto.sources import CryptoModule
+    from modules.vietnam.sources import VietnamModule
+    from modules.indie.sources import IndieModule
     from modules.parody.sources import ParodyModule
     from modules.sport.sources import SportModule
     from modules.political.sources import PoliticalModule
@@ -27,6 +29,8 @@ def load_module(module_name: str):
     registry = {
         "tech":      TechModule,
         "crypto":    CryptoModule,
+        "vietnam":   VietnamModule,
+        "indie":     IndieModule,
         "parody":    ParodyModule,
         "sport":     SportModule,
         "political": PoliticalModule,

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Runtime module state — starts from .env, changed by /module command without restart
 _active_module: str = ACTIVE_MODULE
-AVAILABLE_MODULES = ["tech", "crypto", "parody", "sport", "political", "war", "humor", "energy", "markets"]
+AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie", "parody", "sport", "political", "war", "humor", "energy", "markets"]
 
 # Per-user chat history for /chat command (in-memory, resets on restart)
 _chat_histories: dict[int, list[dict]] = {}
