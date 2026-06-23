@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 _API_KEY = os.getenv("API_KEY", "")
 _bearer = HTTPBearer(auto_error=False)
 
-AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie"]
+AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie", "parody", "sport", "political", "war", "humor", "energy", "markets"]
 
 
 def _verify_token(
