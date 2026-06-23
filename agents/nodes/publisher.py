@@ -21,7 +21,7 @@ async def run(state: KyvraState) -> dict:
     module_name = state["module_name"]
 
     if top_items:
-        memory.mark_seen([i.url for i in top_items], module_name)
+        memory.mark_seen(top_items, module_name)
         logger.info("[publisher] Marked %d items as seen for module '%s'.", len(top_items), module_name)
 
     return {"published": True}

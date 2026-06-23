@@ -71,7 +71,7 @@ class SupervisorAgent:
 
         # Mark delivered items as seen (story continuity) and refresh status cache.
         if ctx.top_items:
-            memory.mark_seen([i.url for i in ctx.top_items], self.module.name)
+            memory.mark_seen(ctx.top_items, self.module.name)
             _STATUS_CACHE[self.module.name] = {
                 "timestamp": time.time(),
                 "status": self._build_status_dict(ctx),
@@ -277,7 +277,7 @@ class SupervisorAgent:
         ctx = await self.writer.run(ctx)
 
         if ctx.top_items:
-            memory.mark_seen([i.url for i in ctx.top_items], self.module.name)
+            memory.mark_seen(ctx.top_items, self.module.name)
             _STATUS_CACHE[self.module.name] = {
                 "timestamp": time.time(),
                 "status": self._build_status_dict(ctx),

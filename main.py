@@ -87,6 +87,9 @@ async def main_async() -> None:
 def main() -> None:
     validate_config()
 
+    import services.memory as memory
+    memory.init_db()
+
     if "--once" in sys.argv:
         async def run_once():
             from agents.graph_runner import GraphRunner
