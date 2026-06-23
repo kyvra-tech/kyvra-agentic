@@ -25,6 +25,8 @@ class RawItem:
     comments: int = 0
     authority_score: int = 10
     cross_source_count: int = 1  # how many sources covered this story (trending signal)
+    media_url: str = ""
+    media_type: str = ""
 
 
 class BaseModule(ABC):

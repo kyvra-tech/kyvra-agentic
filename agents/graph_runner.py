@@ -195,16 +195,16 @@ class GraphRunner:
             logger.error("[GraphRunner] topic LLM call failed: %s", e)
             return "Could not generate report right now. Try again later."
 
-    async def generate_brief(self, user_id: int | None = None, rank: int = 1) -> str:
+    async def generate_brief(self, user_id: int | None = None, rank: int = 1) -> tuple[str, str, str]:
         return await self._content_format("brief", rank=rank, user_id=user_id)
 
-    async def generate_thread(self, user_id: int | None = None, rank: int = 1) -> str:
+    async def generate_thread(self, user_id: int | None = None, rank: int = 1) -> tuple[str, str, str]:
         return await self._content_format("thread", rank=rank, user_id=user_id)
 
-    async def generate_newsletter(self, user_id: int | None = None, rank: int = 1) -> str:
+    async def generate_newsletter(self, user_id: int | None = None, rank: int = 1) -> tuple[str, str, str]:
         return await self._content_format("newsletter", rank=rank, user_id=user_id)
 
-    async def generate_script(self, user_id: int | None = None, rank: int = 1) -> str:
+    async def generate_script(self, user_id: int | None = None, rank: int = 1) -> tuple[str, str, str]:
         return await self._content_format("script", rank=rank, user_id=user_id)
 
     async def generate_tweet_hook(self, rank: int = 1, lang: str | None = None) -> str:
@@ -267,12 +267,12 @@ class GraphRunner:
     # ------------------------------------------------------------------
 
     async def _content_format(self, fmt: str, rank: int = 1,
-                               user_id: int | None = None) -> str:
-        """Run quick scan then call LLM with the right prompt format."""
+                               user_id: int | None = None) -> tuple[str, str, str]:
+        """Run quick scan then call LLM with the right prompt format. Returns (text, media_url, media_type)."""
         state = await self._run("quick")
         top = state.get("top_items") or []
         if not top:
-            return f"No news today to build a {fmt} from. Try again later!"
+            return f"No news today to build a {fmt} from. Try again later!", "", ""
 
         voice = memory.get_voice_profile(0)  # global voice
         clamped = max(0, min(rank, len(top)) - 1)
@@ -305,10 +305,11 @@ class GraphRunner:
         prompt += memory.get_language_instruction()
 
         try:
-            return await get_content_provider().complete(prompt, max_tokens=max_tokens)
+            text = await get_content_provider().complete(prompt, max_tokens=max_tokens)
+            return text, top[clamped].media_url, top[clamped].media_type
         except Exception as e:
             logger.error("[GraphRunner] %s LLM call failed: %s", fmt, e)
-            return f"Could not generate {fmt} right now. Try again later!"
+            return f"Could not generate {fmt} right now. Try again later!", "", ""
 
     def _format_report(self, state: KyvraState) -> str:
         report = state.get("report_text") or "Could not generate report."

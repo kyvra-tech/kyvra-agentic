@@ -25,6 +25,15 @@ async def fetch_rss(source: DataSource) -> list[RawItem]:
 
         items = []
         for entry in feed.entries[:10]:
+            media_url = ""
+            media_type = ""
+            if "media_content" in entry and entry.media_content:
+                media_url = entry.media_content[0].get("url", "")
+                media_type = entry.media_content[0].get("medium", "image")
+            elif "enclosures" in entry and entry.enclosures:
+                media_url = entry.enclosures[0].get("href", "")
+                media_type = entry.enclosures[0].get("type", "image").split("/")[0]
+
             items.append(RawItem(
                 title=entry.get("title", ""),
                 url=entry.get("link", ""),
@@ -32,6 +41,8 @@ async def fetch_rss(source: DataSource) -> list[RawItem]:
                 published_at=entry.get("published", entry.get("updated", "")),
                 summary=entry.get("summary", "")[:500],
                 authority_score=source.authority_score,
+                media_url=media_url,
+                media_type=media_type,
             ))
         cache.set(f"rss:{source.url}", items)
         return items
@@ -104,8 +115,9 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
             "query": query,
             "max_results": max_results,
             "tweet.fields": "created_at,public_metrics,author_id,text",
-            "expansions": "author_id",
+            "expansions": "author_id,attachments.media_keys",
             "user.fields": "username,name",
+            "media.fields": "url,type",
         }
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
@@ -118,6 +130,7 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
 
         tweets = data.get("data", [])
         users = {u["id"]: u for u in data.get("includes", {}).get("users", [])}
+        media_map = {m["media_key"]: m for m in data.get("includes", {}).get("media", [])}
 
         items = []
         for tweet in tweets:
@@ -126,6 +139,16 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
             metrics = tweet.get("public_metrics", {})
             text = tweet.get("text", "")
             tweet_id = tweet.get("id", "")
+            
+            media_url = ""
+            media_type = ""
+            attachments = tweet.get("attachments", {})
+            media_keys = attachments.get("media_keys", [])
+            if media_keys:
+                first_media = media_map.get(media_keys[0], {})
+                media_url = first_media.get("url", "")
+                media_type = first_media.get("type", "image")
+
             items.append(RawItem(
                 title=text[:280],
                 url=f"https://x.com/{username}/status/{tweet_id}",
@@ -135,6 +158,8 @@ async def fetch_x_search(source: DataSource) -> list[RawItem]:
                 score=metrics.get("like_count", 0),
                 comments=metrics.get("reply_count", 0),
                 authority_score=source.authority_score,
+                media_url=media_url,
+                media_type=media_type,
             ))
 
         cache.set(cache_key, items)
@@ -192,6 +217,8 @@ async def fetch_newsapi(source: DataSource) -> list[RawItem]:
                 published_at=article.get("publishedAt", ""),
                 summary=(article.get("description") or "")[:500],
                 authority_score=source.authority_score,
+                media_url=article.get("urlToImage") or "",
+                media_type="image" if article.get("urlToImage") else "",
             ))
 
         cache.set(cache_key, items)

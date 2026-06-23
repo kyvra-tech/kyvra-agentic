@@ -270,13 +270,22 @@ async def cmd_brief(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = await update.message.reply_text("⚡ Writing today's brief...")
     try:
         supervisor = _runner()
-        brief = await supervisor.generate_brief(user_id=user_id, rank=rank)
+        brief, media_url, media_type = await supervisor.generate_brief(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Brief generation failed: {e}")
         await msg.edit_text("❌ Could not generate brief. Please try again later.")
         return
 
     await msg.delete()
+    if media_url:
+        try:
+            if media_type == "video":
+                await update.message.reply_video(video=media_url)
+            else:
+                await update.message.reply_photo(photo=media_url)
+        except Exception as e:
+            logger.warning(f"Failed to attach media {media_url}: {e}")
+
     for chunk in split_long_message(brief):
         await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
 
@@ -292,13 +301,22 @@ async def cmd_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     msg = await update.message.reply_text(f"🧵 Writing thread from {label}... (30-60 sec)")
     try:
         supervisor = _runner()
-        thread = await supervisor.generate_thread(user_id=user_id, rank=rank)
+        thread, media_url, media_type = await supervisor.generate_thread(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Thread generation failed: {e}")
         await msg.edit_text("❌ Could not generate thread. Please try again later.")
         return
 
     await msg.delete()
+    if media_url:
+        try:
+            if media_type == "video":
+                await update.message.reply_video(video=media_url)
+            else:
+                await update.message.reply_photo(photo=media_url)
+        except Exception as e:
+            logger.warning(f"Failed to attach media {media_url}: {e}")
+
     for chunk in split_long_message(thread):
         await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
 
@@ -415,12 +433,21 @@ async def cmd_newsletter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     msg = await update.message.reply_text(f"📰 Writing newsletter section from {label}...")
     try:
         supervisor = _runner()
-        newsletter = await supervisor.generate_newsletter(user_id=user_id, rank=rank)
+        newsletter, media_url, media_type = await supervisor.generate_newsletter(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Newsletter generation failed: {e}")
         await msg.edit_text("❌ Could not generate newsletter section. Please try again later.")
         return
     await msg.delete()
+    if media_url:
+        try:
+            if media_type == "video":
+                await update.message.reply_video(video=media_url)
+            else:
+                await update.message.reply_photo(photo=media_url)
+        except Exception as e:
+            logger.warning(f"Failed to attach media {media_url}: {e}")
+
     for chunk in split_long_message(newsletter):
         await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
 
@@ -436,12 +463,21 @@ async def cmd_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     msg = await update.message.reply_text(f"🎬 Writing voiceover script from {label}...")
     try:
         supervisor = _runner()
-        script = await supervisor.generate_script(user_id=user_id, rank=rank)
+        script, media_url, media_type = await supervisor.generate_script(user_id=user_id, rank=rank)
     except Exception as e:
         logger.error(f"Script generation failed: {e}")
         await msg.edit_text("❌ Could not generate script. Please try again later.")
         return
     await msg.delete()
+    if media_url:
+        try:
+            if media_type == "video":
+                await update.message.reply_video(video=media_url)
+            else:
+                await update.message.reply_photo(photo=media_url)
+        except Exception as e:
+            logger.warning(f"Failed to attach media {media_url}: {e}")
+
     for chunk in split_long_message(script):
         await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
 
