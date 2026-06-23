@@ -153,6 +153,8 @@ def score_item(
         is_spike=_is_spike(item, github_threshold, x_threshold),
         raw_score=item.score,
         cross_source_count=item.cross_source_count,
+        media_url=item.media_url,
+        media_type=item.media_type,
     )
 
 

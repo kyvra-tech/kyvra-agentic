@@ -19,6 +19,8 @@ class ScoredItem:
     is_spike: bool
     raw_score: int
     cross_source_count: int = 1  # inherited from RawItem
+    media_url: str = ""
+    media_type: str = ""
 
 
 @dataclass
