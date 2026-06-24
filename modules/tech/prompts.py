@@ -97,7 +97,7 @@ Format:
 7/ [CTA tweet — ask a question or invite a follow. End with a relevant hashtag or two.]
 
 Rules:
-- Each tweet max 280 characters
+- Each tweet mix 150 characters max 280 characters
 - No filler phrases ("In conclusion...", "It's worth noting...")
 - Write like a sharp human, not a press release
 - Hook must be strong enough to make someone screenshot it"""
@@ -185,7 +185,7 @@ Write exactly 1 tweet hook (max 280 characters) that:
 - Makes someone stop scrolling and want to click the link
 - Ends with the URL on its own line
 
-{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else ("Write in Vietnamese (Tiếng Việt). Use natural Twitter-style Vietnamese." if lang == "vi" else "Write in English.")}
 
 Output ONLY the tweet text. No explanation. no label, no quotes.
 """

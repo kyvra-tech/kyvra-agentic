@@ -168,6 +168,6 @@ Write exactly 1 tweet hook (max 280 chars) that:
 - Makes fans want to click, retweet, and debate
 - Ends with the URL on its own line
 
-{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else ("Write in Vietnamese (Tiếng Việt). Use natural Twitter-style Vietnamese." if lang == "vi" else "Write in English.")}
 
 Output ONLY the tweet text. No explanation."""

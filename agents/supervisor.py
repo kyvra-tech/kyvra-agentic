@@ -134,6 +134,31 @@ class SupervisorAgent:
             payload = self._item_dict(selected_item)
 
         prompt = get_prompt(payload, voice)
+
+        # Enrich prompt with Midjourney/DALL-E and B-Roll video suggestions
+        if format_name in ("thread", "newsletter", "script"):
+            if format_name == "thread":
+                prompt += (
+                    "\n\nAdditionally, for at least 2 key tweets in the thread, append a Midjourney/DALL-E image prompt suggestion "
+                    "at the very end of the tweet in square brackets, like:\n"
+                    "`[📸 Image Prompt: A cinematic photograph of...]`.\n"
+                    "Ensure the image prompt describes a high-quality, vivid visual concept matching the tweet."
+                )
+            elif format_name == "newsletter":
+                prompt += (
+                    "\n\nAdditionally, insert at least 1 Midjourney/DALL-E image prompt suggestion inside the newsletter body "
+                    "(e.g. between sections or within a section) formatted in square brackets, like:\n"
+                    "`[📸 Image Prompt: A high-resolution realistic image of...]`.\n"
+                    "Ensure the image prompt describes a high-quality, vivid visual concept matching the newsletter story."
+                )
+            elif format_name == "script":
+                prompt += (
+                    "\n\nAdditionally, for EACH section of the script (HOOK, SETUP, THE MEAT, TWIST/SURPRISE, CTA), you MUST "
+                    "include a detailed B-roll video clip suggestion or background visual description in square brackets, like:\n"
+                    "`[🎬 B-Roll: Close-up of hands typing fast on a keyboard, screen reflecting code...]`.\n"
+                    "Write this visual description right before the spoken text in that section."
+                )
+
         try:
             result = await get_content_provider().complete(prompt, max_tokens=max_tokens)
         except Exception as e:
@@ -205,7 +230,7 @@ class SupervisorAgent:
         )
 
     async def generate_tweet_hook(self, rank: int = 1, lang: str = "en") -> str:
-        """Generate a single viral tweet hook for story #rank in the given language (en|ja)."""
+        """Generate a single viral tweet hook for story #rank in the given language (en|ja|vi)."""
         from services.llm_provider import get_content_provider
 
         ctx = await self._collect_and_score()
@@ -326,28 +351,5 @@ async def generate_report_for_module_with_ctx(module_name: str):
 
 
 def load_module(module_name: str) -> BaseModule:
-    from modules.tech.sources import TechModule
-    from modules.crypto.sources import CryptoModule
-    from modules.parody.sources import ParodyModule
-    from modules.sport.sources import SportModule
-    from modules.political.sources import PoliticalModule
-    from modules.war.sources import WarModule
-    from modules.humor.sources import HumorModule
-    from modules.energy.sources import EnergyModule
-    from modules.markets.sources import MarketsModule
-
-    registry: dict[str, type[BaseModule]] = {
-        "tech":      TechModule,
-        "crypto":    CryptoModule,
-        "parody":    ParodyModule,
-        "sport":     SportModule,
-        "political": PoliticalModule,
-        "war":       WarModule,
-        "humor":     HumorModule,
-        "energy":    EnergyModule,
-        "markets":   MarketsModule,
-    }
-    cls = registry.get(module_name)
-    if cls is None:
-        raise ValueError(f"Unknown module: '{module_name}'. Available: {list(registry)}")
-    return cls()
+    from agents.registry import load_module as registry_load_module
+    return registry_load_module(module_name)

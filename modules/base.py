@@ -74,11 +74,13 @@ class BaseModule(ABC):
 
     def get_tweet_hook_prompt(self, item: dict, lang: str = "en") -> str:
         """Return the prompt to generate a single viral tweet hook for a story."""
-        lang_instruction = (
-            "Write the tweet in Japanese (日本語). Use natural, fluent Japanese suitable for Twitter/X."
-            if lang == "ja"
-            else "Write the tweet in English."
-        )
+        if lang == "ja":
+            lang_instruction = "Write the tweet in Japanese (日本語). Use natural, fluent Japanese suitable for Twitter/X."
+        elif lang == "vi":
+            lang_instruction = "Write the tweet in Vietnamese (Tiếng Việt). Use natural, fluent Vietnamese suitable for Twitter/X."
+        else:
+            lang_instruction = "Write the tweet in English."
+
         return (
             f"Write 1 compelling tweet hook (max 280 chars) about this story.\n"
             f"{lang_instruction}\n"

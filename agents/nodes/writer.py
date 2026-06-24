@@ -87,6 +87,30 @@ async def run(state: KyvraState) -> dict:
         else:
             prompt = module.get_report_prompt(enriched)
 
+        # Enrich prompt with Midjourney/DALL-E and B-Roll video suggestions
+        if fmt in ("thread", "newsletter", "script"):
+            if fmt == "thread":
+                prompt += (
+                    "\n\nAdditionally, for at least 2 key tweets in the thread, append a Midjourney/DALL-E image prompt suggestion "
+                    "at the very end of the tweet in square brackets, like:\n"
+                    "`[📸 Image Prompt: A cinematic photograph of...]`.\n"
+                    "Ensure the image prompt describes a high-quality, vivid visual concept matching the tweet."
+                )
+            elif fmt == "newsletter":
+                prompt += (
+                    "\n\nAdditionally, insert at least 1 Midjourney/DALL-E image prompt suggestion inside the newsletter body "
+                    "(e.g. between sections or within a section) formatted in square brackets, like:\n"
+                    "`[📸 Image Prompt: A high-resolution realistic image of...]`.\n"
+                    "Ensure the image prompt describes a high-quality, vivid visual concept matching the newsletter story."
+                )
+            elif fmt == "script":
+                prompt += (
+                    "\n\nAdditionally, for EACH section of the script (HOOK, SETUP, THE MEAT, TWIST/SURPRISE, CTA), you MUST "
+                    "include a detailed B-roll video clip suggestion or background visual description in square brackets, like:\n"
+                    "`[🎬 B-Roll: Close-up of hands typing fast on a keyboard, screen reflecting code...]`.\n"
+                    "Write this visual description right before the spoken text in that section."
+                )
+
         # Inject voice into formats that don't accept it natively (report)
         # Prepend voice so it doesn't override the strict formatting instructions at the end of the prompt
         if fmt in ("report",) and voice_block:

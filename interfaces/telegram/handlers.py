@@ -110,7 +110,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "━━━ ⚙️ SETTINGS ━━━\n"
         "🎙 */setvoice \\[description\\]* – Save your writing style for all content\n"
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
-        "🌐 */lang \\[en|ja\\]* – Set output language (English or Japanese)\n"
+        "🌐 */lang \\[en|ja|vi\\]* – Set output language (English, Japanese, or Vietnamese)\n"
         "🧩 */module \\[name\\]* – Switch focus module\n"
         "   tech \\| crypto \\| vietnam \\| indie \\| parody \\| sport \\| political \\| war\n"
 
@@ -177,6 +177,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             rows.append([
                 InlineKeyboardButton(f"🐦 EN #{i}", callback_data=f"tweet:{_active_module}:{i}:en"),
                 InlineKeyboardButton(f"🇯🇵 JA #{i}", callback_data=f"tweet:{_active_module}:{i}:ja"),
+                InlineKeyboardButton(f"🇻🇳 VI #{i}", callback_data=f"tweet:{_active_module}:{i}:vi"),
             ])
         keyboard = InlineKeyboardMarkup(rows)
 
@@ -518,7 +519,7 @@ async def cmd_setvoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/lang [en|ja] — set the global output language."""
+    """/lang [en|ja|vi] — set the global output language."""
     user_id = update.effective_user.id
     requested = context.args[0].lower().strip() if context.args else ""
 
@@ -529,7 +530,7 @@ async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
             f"🌐 Current language: *{label}*\n\n"
             f"Available: {options}\n\n"
-            "Usage: `/lang ja` to switch to Japanese",
+            "Usage: `/lang ja` to switch to Japanese, or `/lang vi` for Vietnamese",
             parse_mode="Markdown",
         )
         return
@@ -643,14 +644,19 @@ async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     module_name = parts[1]
-    lang = parts[3]  # "en" or "ja"
+    lang = parts[3]  # "en", "ja", or "vi"
     try:
         rank = int(parts[2])
     except ValueError:
         return
 
     user_id = update.effective_user.id
-    lang_label = "🇯🇵 Japanese" if lang == "ja" else "🐦 English"
+    if lang == "ja":
+        lang_label = "🇯🇵 Japanese"
+    elif lang == "vi":
+        lang_label = "🇻🇳 Vietnamese"
+    else:
+        lang_label = "🐦 English"
     logger.info(f"[Analytics] user={user_id} tweet_callback module={module_name} rank={rank} lang={lang}")
 
     await query.message.reply_text(f"✍️ Generating {lang_label} tweet for story #{rank}...")
@@ -663,7 +669,12 @@ async def handle_tweet_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text("❌ Could not generate tweet. Try again.")
         return
 
-    flag = "🇯🇵" if lang == "ja" else "🐦"
+    if lang == "ja":
+        flag = "🇯🇵"
+    elif lang == "vi":
+        flag = "🇻🇳"
+    else:
+        flag = "🐦"
     await query.message.reply_text(f"{flag}\n```\n{tweet}\n```", parse_mode="Markdown")
 
 
