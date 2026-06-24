@@ -19,7 +19,7 @@ async def fetch_rss(source: DataSource) -> list[RawItem]:
 
     try:
         async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
-            resp = await client.get(source.url)
+            resp = await client.get(source.url, follow_redirects=True)
             resp.raise_for_status()
             feed = feedparser.parse(resp.text)
 

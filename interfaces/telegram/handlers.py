@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Runtime module state — starts from .env, changed by /module command without restart
 _active_module: str = ACTIVE_MODULE
-AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie", "parody", "sport", "political", "war", "humor", "energy", "markets"]
+AVAILABLE_MODULES = ["tech", "crypto", "vietnam", "indie", "parody", "sport", "political", "war", "humor", "energy", "markets", "web3"]
 
 # Per-user chat history for /chat command (in-memory, resets on restart)
 _chat_histories: dict[int, list[dict]] = {}
@@ -112,7 +112,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "   e.g. `/setvoice Casual, punchy, uses data and metaphors`\n"
         "🌐 */lang \\[en|ja|vi\\]* – Set output language (English, Japanese, or Vietnamese)\n"
         "🧩 */module \\[name\\]* – Switch focus module\n"
-        "   tech \\| crypto \\| vietnam \\| indie \\| parody \\| sport \\| political \\| war\n"
+        "   tech \\| crypto \\| vietnam \\| indie \\| parody \\| sport \\| political \\| war \\| humor \\| energy \\| markets \\| web3\n"
 
         "📅 Auto-report every day at *8:00 AM* (GMT+7)"
     )

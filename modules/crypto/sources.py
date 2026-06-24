@@ -13,7 +13,7 @@ class CryptoModule(BaseModule):
             # ── Tier 1: crypto-native publications ────────────────────────
             DataSource(
                 name="CoinDesk",
-                url="https://www.coindesk.com/arc/outboundfeeds/rss/",
+                url="https://www.coindesk.com/arc/outboundfeeds/rss",
                 source_type="rss",
                 params={},
                 authority_score=SOURCE_AUTHORITY.get("CoinDesk", 18),
