@@ -26,6 +26,7 @@ def load_module(module_name: str):
     from modules.energy.sources import EnergyModule
     from modules.markets.sources import MarketsModule
     from modules.web3.sources import Web3Module
+    from modules.wisdom.sources import WisdomModule
 
     registry = {
         "tech":      TechModule,
@@ -40,6 +41,7 @@ def load_module(module_name: str):
         "energy":    EnergyModule,
         "markets":   MarketsModule,
         "web3":      Web3Module,
+        "wisdom":    WisdomModule,
     }
     cls = registry.get(module_name)
     if cls is None:
