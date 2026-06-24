@@ -90,7 +90,7 @@ def get_voice_profile(user_id: int) -> str | None:
 # ── Language preference (global, file-based) ──────────────────────────────────
 
 LANG_FILE = Path("lang.txt")
-SUPPORTED_LANGUAGES = {"en": "English", "ja": "Japanese (日本語)"}
+SUPPORTED_LANGUAGES = {"en": "English", "ja": "Japanese (日本語)", "vi": "Vietnamese (Tiếng Việt)"}
 DEFAULT_LANGUAGE = "en"
 
 
@@ -108,7 +108,7 @@ def save_language(lang: str) -> None:
 
 
 def get_language() -> str:
-    """Return the global language code ('en' or 'ja'). Defaults to 'en'."""
+    """Return the global language code ('en', 'ja', or 'vi'). Defaults to 'en'."""
     try:
         if LANG_FILE.exists():
             lang = LANG_FILE.read_text(encoding="utf-8").strip().lower()
@@ -122,11 +122,13 @@ def get_language() -> str:
 def get_language_instruction(lang: str | None = None) -> str:
     """Return a prompt instruction block for the given language.
 
-    Returns empty string for English (default), explicit instruction for JA.
+    Returns empty string for English (default), explicit instruction for JA and VI.
     """
     lang = lang or get_language()
     if lang == "ja":
         return "\n\nIMPORTANT: Write the ENTIRE output in Japanese (日本語). Use natural, fluent Japanese."
+    if lang == "vi":
+        return "\n\nIMPORTANT: Write the ENTIRE output in Vietnamese (Tiếng Việt). Use natural, fluent Vietnamese."
     return ""
 
 

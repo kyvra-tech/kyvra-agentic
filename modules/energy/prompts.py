@@ -171,6 +171,6 @@ Write exactly 1 tweet (max 280 chars) that:
 - Uses $TICKER format for energy stocks/ETFs where relevant
 - Ends with the URL on its own line
 
-{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else ("Write in Vietnamese (Tiếng Việt). Use natural Twitter-style Vietnamese." if lang == "vi" else "Write in English.")}
 
 Output ONLY the tweet text. No explanation."""

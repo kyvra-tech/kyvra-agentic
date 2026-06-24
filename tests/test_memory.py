@@ -102,3 +102,24 @@ class TestGetSeenUrls:
         # 1-day window should still include just-marked items
         seen = memory.get_seen_urls("tech", days=1)
         assert "https://x.com/new" in seen
+
+
+# ── Language Preferences ──────────────────────────────────────────────────────
+
+class TestLanguagePreferences:
+    def test_language_preference(self, tmp_path):
+        test_lang_file = tmp_path / "test_lang.txt"
+        with patch.object(memory, "LANG_FILE", test_lang_file):
+            assert memory.get_language() == "en"
+            memory.save_language("ja")
+            assert memory.get_language() == "ja"
+            memory.save_language("vi")
+            assert memory.get_language() == "vi"
+            memory.save_language("fr")  # unsupported
+            assert memory.get_language() == "en"
+
+    def test_get_language_instruction(self):
+        assert "Japanese" in memory.get_language_instruction("ja")
+        assert "Vietnamese" in memory.get_language_instruction("vi")
+        assert memory.get_language_instruction("en") == ""
+

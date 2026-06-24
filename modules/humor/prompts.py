@@ -69,7 +69,7 @@ Summary: {item['summary']}
 
 Write a 7-tweet entertainment thread. Fun, fast, shareable. Ready to copy-paste.
 
-1/ [Hook — the most surprising/funny/shocking part. Max 280 chars.]
+1/ [Hook — the most surprising/funny/shocking part. min 150 chars, max 280 chars.]
 2/ [The backstory — quick context for people who missed it]
 3/ [The internet's reaction — what are people saying/doing]
 4/ [The funniest take or meme angle]
@@ -77,7 +77,7 @@ Write a 7-tweet entertainment thread. Fun, fast, shareable. Ready to copy-paste.
 6/ [What happens next — predictions or drama incoming]
 7/ [CTA — ask followers for their take. Include 1-2 relevant hashtags.]
 
-Rules: each tweet max 280 chars. Energy > analysis."""
+Rules: each tweet min 150 chars, max 280 chars. Energy > analysis."""
 
 
 def build_brief_prompt(items: list[dict], voice: str | None = None) -> str:
@@ -163,11 +163,11 @@ Title: {item['title']}
 URL: {item['url']}
 Summary: {item['summary']}
 
-Write exactly 1 tweet (max 280 chars) that:
+Write exactly 1 tweet (min 150 chars max 280 chars) that:
 - Leads with the most surprising or funny angle
 - Makes people want to click, quote-tweet, or reply
 - Ends with the URL on its own line
 
-{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else "Write in English."}
+{"Write in Japanese (日本語). Use natural Twitter-style Japanese." if lang == "ja" else ("Write in Vietnamese (Tiếng Việt). Use natural Twitter-style Vietnamese." if lang == "vi" else "Write in English.")}
 
 Output ONLY the tweet text. No explanation."""
