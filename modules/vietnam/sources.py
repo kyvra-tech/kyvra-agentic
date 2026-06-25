@@ -11,32 +11,46 @@ class VietnamModule(BaseModule):
     def get_sources(self) -> list[DataSource]:
         return [
             DataSource(
-                name="VnExpress Tech",
-                url="https://vnexpress.net/rss/khoa-hoc-cong-nghe.rss",
+                name="Kenh14 Star",
+                url="https://kenh14.vn/star.rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["VnExpress Tech"],
+                authority_score=SOURCE_AUTHORITY["Kenh14 Star"],
             ),
             DataSource(
-                name="CafeF Tech",
-                url="https://cafef.vn/cong-nghe.rss",
+                name="Kenh14 Doi Song",
+                url="https://kenh14.vn/doi-song.rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["CafeF Tech"],
+                authority_score=SOURCE_AUTHORITY["Kenh14 Doi Song"],
             ),
             DataSource(
-                name="ICTNews",
-                url="https://ictnews.vn/rss/home.rss",
+                name="Ngoisao Hau Truong",
+                url="https://ngoisao.vnexpress.net/rss/hau-truong.rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["ICTNews"],
+                authority_score=SOURCE_AUTHORITY["Ngoisao Hau Truong"],
             ),
             DataSource(
-                name="TechInAsia VN",
-                url="https://www.techinasia.com/feed",
+                name="Ngoisao Lam Dep",
+                url="https://ngoisao.vnexpress.net/rss/lam-dep.rss",
                 source_type="rss",
                 params={},
-                authority_score=SOURCE_AUTHORITY["TechInAsia VN"],
+                authority_score=SOURCE_AUTHORITY["Ngoisao Lam Dep"],
+            ),
+            DataSource(
+                name="Google News - Bar San",
+                url="https://news.google.com/rss/search?q=bar+lounge+club+qu%E1%BB%95y+nightlife&hl=vi&gl=VN&ceid=VN:vi",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY["Google News - Bar San"],
+            ),
+            DataSource(
+                name="Google News - Gai Xinh",
+                url="https://news.google.com/rss/search?q=g%C3%A1i+xinh+hot+girl+l%C3%A0m+%C4%91%E1%BBA1p+th%E1%BB%9Di+trang&hl=vi&gl=VN&ceid=VN:vi",
+                source_type="rss",
+                params={},
+                authority_score=SOURCE_AUTHORITY["Google News - Gai Xinh"],
             ),
         ]
 
