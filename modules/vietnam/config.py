@@ -1,21 +1,20 @@
 KEYWORDS = [
-    # Vietnamese tech companies
-    "vng", "momo", "zalopay", "tiki", "shopee vn", "grab vietnam",
-    "vnpay", "techcombank", "viettel", "fpt", "vingroup", "vinai",
-    # Tech topics in Vietnamese context
-    "vietnam tech", "startup vietnam", "vietnam ai", "hcmc tech",
-    "hanoi tech", "dong nam a", "southeast asia tech",
-    # Crypto Vietnam
-    "coin98", "kyber", "ancient8", "sky mavis", "axie", "vndc", "viction",
-    # General tech (English + Vietnamese terms)
-    "khoi nghiep", "cong nghe", "tri tue nhan tao",
-    "llm", "ai", "startup", "fintech", "blockchain",
+    # Girls (clean lifestyle, fashion, beauty, pretty, no sexy/NSFW)
+    "gái xinh", "hot girl", "nữ thần", "mỹ nhân", "kols", "influencer",
+    "thời trang", "outfit", "làm đẹp", "make up", "phong cách", "nhan sắc",
+    "diễn viên", "người mẫu", "hoa hậu", "á hậu", "beauty blogger",
+    # Bar/Club/Lounge (nightlife, music, party)
+    "bar", "club", "lounge", "pub", "sàn", "quẩy", "nightlife", "dj",
+    "edm", "vinahouse", "tiệc tùng", "party", "cocktail", "rượu bia",
+    "hangout", "chơi đêm", "lên đồ", "nhạc sống"
 ]
 
 SOURCE_AUTHORITY = {
-    "VnExpress Tech": 14,
-    "CafeF Tech": 12,
-    "ICTNews": 11,
-    "TechInAsia VN": 13,
-    "X - Vietnam Tech": 13,
+    "Kenh14 Star": 15,
+    "Kenh14 Doi Song": 14,
+    "Ngoisao Hau Truong": 14,
+    "Ngoisao Lam Dep": 13,
+    "Google News - Bar San": 12,
+    "Google News - Gai Xinh": 12,
 }
+
